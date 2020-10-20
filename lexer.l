@@ -1,69 +1,41 @@
 %{  
-    #include "ekcc.h"
+    #include "parser.tab.c"
     #include <iostream>
-    using std::cout;
-    using std::endl; 
+    #include <string>
+    #include <cstdlib>
 
-    extern "C" int yylex();
+    using namespace std;
 %}
 %option noyywrap
 %%
 [ \t\n]+     { /* Ignore white space. */ }
 [#].*\n      { /* Ignore comments. */ }
-"+"          { cout << "PLUS " << yytext << endl; }
-"-"          { cout << "MINUS " << yytext << endl; }
-"*"          { cout << "TIMES " << yytext << endl; }
-"/"          { cout << "SLASH " << yytext << endl; }
-"=="         { cout << "EQUAL " << yytext << endl; }
-"<"          { cout << "LESS " << yytext << endl; }
-">"          { cout << "GREATER " << yytext << endl; }
-"&&"         { cout << "AND " << yytext << endl; }
-"||"         { cout << "OR " << yytext << endl; }
-"!"          { cout << "NOT " << yytext << endl; }
-"="          { cout << "ASSIGN " << yytext << endl; }
-","          { cout << "COMMA " << yytext << endl; }
-";"          { cout << "SEMICOLON " << yytext << endl; }
-"("          { cout << "L_PAREN " << yytext << endl; }
-")"          { cout << "R_PAREN " << yytext << endl; }
-"["          { cout << "L_BRACKET " << yytext << endl; }
-"]"          { cout << "R_BRACKET " << yytext << endl; }
-"{"          { cout << "L_BRACE " << yytext << endl; }
-"}"          { cout << "R_BRACE " << yytext << endl; }
-"$"          { cout << "DOLLAR " << yytext << endl; }
-extern       { cout << "EXTERN " << yytext << endl; }
-def          { cout << "DEF " << yytext << endl; }
-return       { cout << "RETURN " << yytext << endl; }
-while        { cout << "WHILE " << yytext << endl; }
-if           { cout << "IF " << yytext << endl; }
-else         { cout << "ELSE " << yytext << endl; }
-print        { cout << "PRINT " << yytext << endl; }
-true         { cout << "TRUE " << yytext << endl; }
-false        { cout << "FALSE " << yytext << endl; }
-int          { cout << "INT " << yytext << endl; }
-cint         { cout << "CINT " << yytext << endl; }
-float        { cout << "FLOAT " << yytext << endl; }
-bool         { cout << "BOOL " << yytext << endl; }
-void         { cout << "VOID " << yytext << endl; }
-noalias      { cout << "NOALIAS " << yytext << endl; }
-ref          { cout << "REF " << yytext << endl; }
 
-[a-zA-Z_][a-zA-Z0-9_]*  { cout << "IDENTIFIER " << yytext << endl; }
-[0-9]+                  { cout << "LITERAL_INT " << yytext << endl; }
-[0-9]+\.[0-9]+          { cout << "LITERAL_FLOAT " << yytext << endl; }
-\"[^"\n\r]*\"           { cout << "LITERAL_STR " << yytext << endl; }
+extern       { return EXTERN; }
+def          { return DEF; }
+return       { return RETURN; }
+while        { return WHILE; }
+if           { return IF; }
+else         { return ELSE; }
+print        { return PRINT; }
+true         { return TRUE; }
+false        { return FALSE; }
+int          { return INT; }
+cint         { return CINT; }
+float        { return FLOAT; }
+bool         { return BOOL; }
+void         { return VOID; }
+noalias      { return NOALIAS; }
+ref          { return REF; }
+
+"=="         { return EQUAL; }
+"&&"         { return AND; }
+"||"         { return OR; }
+[(){}\[\],;=<>!$*/+-]   { return yytext[0]; }
+
+[a-zA-Z_][a-zA-Z0-9_]*  { yylval.sval = yytext; return IDENTIFIER; }
+[0-9]+                  { yylval.ival = atoi(yytext); return LITERAL_INT; }
+[0-9]+\.[0-9]+          { yylval.fval = atof(yytext); return LITERAL_FLOAT; }
+\"[^"\n\r]*\"           { yylval.sval = yytext; return LITERAL_STR; }
 
 %%
-
-int main(int argc, char* argv[]) {
-    if (argc > 1) {
-        FILE *f = fopen(argv[1], "r");
-        if (!f) {
-            cout << "Input file: " << argv[1] << " not found.\n";
-            return -1;
-        }
-        yyin = f;
-    }
-    
-    yylex();
-    return 0;
-}
