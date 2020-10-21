@@ -1,13 +1,12 @@
 CC = g++
 CFLAG = -Wall -Wextra -pedantic -std=c++11 -g
 
-all: ekcc.o
-	$(CC) $(CFLAG) -o ekcc $^
+all: ekcc
 
-ekcc.o: lexer.l parser.y
+ekcc: lexer.l parser.y
 	bison -d parser.y
 	flex -olexer.c lexer.l
-	$(CC) -c lexer.c parser.tab.c
+	$(CC) $(CFLAG) -o ekcc lexer.c parser.tab.c
 
 
 

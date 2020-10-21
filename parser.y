@@ -18,7 +18,7 @@
 %union {
     int ival;
     float fval;
-    string sval;
+    char* sval;
 }
 
 /* Token definitions */
@@ -37,8 +37,11 @@
 
 %%
 /* Grammer rules of the parser */
-exp: INT '$' IDENTIFIER '=' LITERAL_INT ';' { cout << "IDENTIFIER: " << $3 + "\n" << "LITERAL_INT" << $5 << endl; } 
-    | PRINT LITERAL_STR ';' { cout << "LITERAL_STR: " << $2 + "\n"; }
+exps: exp 
+    | exps exp
+
+exp: INT '$' IDENTIFIER '=' LITERAL_INT ';' { cout << "IDENTIFIER: " << $3 << "; " << "LITERAL_INT: " << $5 << endl; free($3); } 
+    | PRINT LITERAL_STR ';' { cout << "LITERAL_STR: " << $2 << endl; free($2); }
 
 %%
 

@@ -1,5 +1,5 @@
 %{  
-    #include "parser.tab.c"
+    #include "parser.tab.h"
     #include <iostream>
     #include <string>
     #include <cstdlib>
@@ -33,9 +33,9 @@ ref          { return REF; }
 "||"         { return OR; }
 [(){}\[\],;=<>!$*/+-]   { return yytext[0]; }
 
-[a-zA-Z_][a-zA-Z0-9_]*  { yylval.sval = yytext; return IDENTIFIER; }
+[a-zA-Z_][a-zA-Z0-9_]*  { yylval.sval = strdup(yytext); return IDENTIFIER; }
 [0-9]+                  { yylval.ival = atoi(yytext); return LITERAL_INT; }
 [0-9]+\.[0-9]+          { yylval.fval = atof(yytext); return LITERAL_FLOAT; }
-\"[^"\n\r]*\"           { yylval.sval = yytext; return LITERAL_STR; }
+\"[^"\n\r]*\"           { yylval.sval = strdup(yytext); return LITERAL_STR; }
 
 %%
