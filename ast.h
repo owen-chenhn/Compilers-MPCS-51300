@@ -394,11 +394,11 @@ struct funcs : public node {
 };
 
 struct ext : public node {
-    type *rt;
+    struct type *rt;
     string globid;
     tdecls *type;
 
-    ext(struct type *r, string g, struct tdecls *t = 0) : rt(r), globid(g), type(t) {}
+    ext(struct type *r, string g, tdecls *t = 0) : rt(r), globid(g), type(t) {}
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
