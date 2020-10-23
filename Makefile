@@ -11,4 +11,4 @@ ekcc: lexer.l parser.y
 
 
 clean: 
-	rm -rf *.o lexer.c parser.tab.* ekcc
+	rm -rf *.o lexer.c parser.tab.* ekcc *.my_test_res.yaml *.dSYM
