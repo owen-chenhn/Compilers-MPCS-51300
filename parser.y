@@ -34,6 +34,7 @@
     float fval;
     char* sval;
     struct type *a_type;
+    struct id *a_id;
     struct vdecl *a_vdecl;
     struct tdecls *a_tdecls;
     struct vdecls *a_vdecls;
@@ -65,7 +66,7 @@
 %token <sval> IDENTIFIER GIDENTIFIER LITERAL_STR 
 
 // type 
-%type <sval> varid globid 
+%type <a_id> varid globid 
 %type <a_type> type
 %type <a_vdecl> vdecl 
 %type <a_tdecls> tdecls 
@@ -132,7 +133,7 @@ stmt     : blk                                    {$$ = $1; }
          | IF '(' exp ')' stmt ELSE stmt %prec "else" {$$ = new ifstmt($3, $5, $7); }
          | IF '(' exp ')' stmt %prec "then"       {$$ = new ifstmt($3, $5); }
          | PRINT exp ';'                          {$$ = new print($2); }
-         | PRINT LITERAL_STR ';'                  {$$ = new printslit($2); }
+         | PRINT LITERAL_STR ';'                  {$$ = new printslit($2); free($2); }
          ;
 
 exps     : exp                                    {$$ = new exps(); $$->expressions.push_back($1); }
@@ -173,10 +174,10 @@ uop      : '!' exp                                {$$ = new uop(uop::uop_not, $2
 
 // lit and slit and ident done in lexer.l and header  
 
-varid    : IDENTIFIER                             {$$ = $1; }
+varid    : IDENTIFIER                             {$$ = new id($1); free($1); }
          ;
 
-globid   : GIDENTIFIER                            {$$ = $1; }
+globid   : GIDENTIFIER                            {$$ = new id($1); free($1); }
          ; 
 
 type     : INT                                    {$$ = new type(type::t_int); } 
@@ -221,6 +222,7 @@ int main(int argc, char* argv[]) {
 
     cout << "..." << endl;
 
+    delete the_prog;
     return 0;
 }
 
