@@ -221,7 +221,7 @@ void Usage() {
 
 int main(int argc, char* argv[]) {
     bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false;
-    string input, output;
+    string output = "";
 
     // Command-line options parsing
     const char *optstring = "h?vOo:";
@@ -230,10 +230,8 @@ int main(int argc, char* argv[]) {
         {"emit-llvm", no_argument, nullptr, 'l'},
         {0, 0, 0, 0}
     };
-
     int optret;
     int longindex;
-
     while ((optret = getopt_long_only(argc, argv, optstring, longopts, &longindex)) != -1) {
         switch(optret) {
         case 'h' :
@@ -258,34 +256,32 @@ int main(int argc, char* argv[]) {
             break;
         }
     }
+    
     if (emit_ast && emit_llvm) {
-        cout << "Error: flag -emit-ast and flag -emit-llvm cannot be set simultaneously.\n";
+        cout << "error: flag -emit-ast and flag -emit-llvm cannot be set simultaneously.\n";
+        exit(-1);
+    }
+    if (output.size() == 0) {
+        cout << "error: no output file specified.\n";
         exit(-1);
     }
     if (optind == argc) {
-        cout << "Error: no input file specified.\n";
+        cout << "error: no input file specified.\n";
         exit(-1);
     }
-    input = argv[optind];
-    cout << "Input path: " << input << "\nOutput path: " << output << endl;
 
-/*
-    FILE *in_f = fopen(input, "r");
+    FILE *in_f = fopen(argv[optind], "r");
     if (!in_f) {
-        cout << "Input file: " << input << " not found.\n";
+        cout << "error: input file: " << argv[optind] << " not found.\n";
         return -1;
     }
     yyin = in_f;
 
-    if (output.size() > 0) {
-        ostream &os = ofstream(output, ios::out);
-        if (!os) {
-            cout << "Failed to open output file: " << output << endl;
-            exit(-1);
-        }
-    } 
-    else 
-        ostream &os = cout; 
+    ofstream os(output, ios::out);
+    if (!os) {
+        cout << "error: failed to open output file: " << output << endl;
+        exit(-1);
+    }
 
     do {
         yyparse();
@@ -298,7 +294,6 @@ int main(int argc, char* argv[]) {
     }
 
     delete the_prog;
-*/
     return 0;
 }
 
