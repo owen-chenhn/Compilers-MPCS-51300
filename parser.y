@@ -203,26 +203,86 @@ vdecl    : type varid                             {$$ = new vdecl($1, $2); }
 %%       
 
 int main(int argc, char* argv[]) {
-    if (argc > 1) { 
-        FILE *f = fopen(argv[1], "r");
-        if (!f) {
-            cout << "Input file: " << argv[1] << " not found.\n";
-            return -1;
-        }
-        yyin = f;
-    }
+    bool help = false, verbose = false, optimize = false, emit_ast = false, emit_llvm = false;
+    string input, output;
 
-    cout << "---" << endl;
+    // Command-line options parsing
+    const char *optstring = "h?vOo:";
+    const struct option longopts[] = {
+        {"emit-ast", no_argument, nullptr, 'a'}, 
+        {"emit-llvm", no_argument, nullptr, 'l'},
+        {0, 0, 0, 0}
+    };
+
+    int optret;
+    int longindex;
+
+    while ((optret = getopt_long_only(argc, argv, optstring, longopts, &longindex)) != -1) {
+        switch(optret) {
+        case 'h' :
+            help = true;
+            break;
+        case '?' :
+            help = true;
+            break;
+        case 'v' :
+            verbose = true;
+            break;
+        case 'O' :
+            optimize = true;
+            break;
+        case 'o' :
+            output = optarg;
+            break;
+        case 'a' :
+            emit_ast = true;
+            break;
+        case 'l' :
+            emit_llvm = true;
+            break;
+
+        default :
+            cout << "Invalid arguments." << endl;
+            exit(-1);
+        }
+    }
+    if (optind == argc) {
+        cout << "Error: no input file specified.\n";
+        exit(-1);
+    }
+    input = argv[optind];
+    cout << "Input path: " << input << "\nOutput path: " << output << endl;
+
+/*
+    FILE *in_f = fopen(input, "r");
+    if (!in_f) {
+        cout << "Input file: " << input << " not found.\n";
+        return -1;
+    }
+    yyin = in_f;
+
+    if (output.size() > 0) {
+        ostream &os = ofstream(output, ios::out);
+        if (!os) {
+            cout << "Failed to open output file: " << output << endl;
+            exit(-1);
+        }
+    } 
+    else 
+        ostream &os = cout; 
 
     do {
         yyparse();
     } while (!feof(yyin)); 
 
-    the_prog->yaml(cout, "");
-
-    cout << "..." << endl;
+    if (emit_ast) {
+        os << "---" << endl;
+        the_prog->yaml(os, "");
+        os << "..." << endl;
+    }
 
     delete the_prog;
+*/
     return 0;
 }
 
