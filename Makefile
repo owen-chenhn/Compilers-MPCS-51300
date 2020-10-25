@@ -1,13 +1,15 @@
-CC = g++
-CFLAG = -Wall -Wextra -pedantic -std=c++11 -g
+CXXFLAG = -Wall -Wextra -pedantic -std=c++11 -g
 
 all: ekcc
 
-ekcc: lexer.l parser.y ekcc.cpp
-	bison -d parser.y
-	flex -olexer.c lexer.l
-	$(CC) $(CFLAG) -o ekcc lexer.c parser.tab.c ekcc.cpp
+ekcc: ekcc.cpp parser lexer
+	$(CXX) $(CXXFLAG) -o ekcc lexer.c parser.tab.c ekcc.cpp
 
+parser: parser.y
+	bison -d parser.y
+
+lexer: lexer.l parser
+	flex -olexer.c lexer.l
 
 
 clean: 
