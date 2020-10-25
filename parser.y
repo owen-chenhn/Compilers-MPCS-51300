@@ -202,8 +202,25 @@ vdecl    : type varid                             {$$ = new vdecl($1, $2); }
 
 %%       
 
+/* Print helper messages. */
+void Header() {
+    cout << "EKCC - A compiler for language Extended-Kaleidoscope.\n" << 
+            "Author: \n\tHaoning Chen (owenchen97@uchicago.edu), Yi Ding (yiding1@uchicago.edu)\n";
+}
+
+void Usage() {
+    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm] -o <output-file> <input-file>\n" << 
+            "\t" << "-h|-?: Print helper message.\n" << 
+            "\t" << "-v: Enable verbose mode.\n" << 
+            "\t" << "-O: Enable optimization.\n" << 
+            "\t" << "-emit-ast: Produce the AST of the input program to the output file.\n" << 
+            "\t" << "-emit-llvm: Produce the LLVM IR of the input program to the output file.\n" << 
+            "\t" << "-o <output-file>: Path to the output file.\n" << 
+            "\t" << "<input-file>: Path to the input ek program.\n";
+}
+
 int main(int argc, char* argv[]) {
-    bool help = false, verbose = false, optimize = false, emit_ast = false, emit_llvm = false;
+    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false;
     string input, output;
 
     // Command-line options parsing
@@ -220,11 +237,10 @@ int main(int argc, char* argv[]) {
     while ((optret = getopt_long_only(argc, argv, optstring, longopts, &longindex)) != -1) {
         switch(optret) {
         case 'h' :
-            help = true;
-            break;
         case '?' :
-            help = true;
-            break;
+            Header();
+            Usage();
+            exit(0);
         case 'v' :
             verbose = true;
             break;
@@ -240,11 +256,11 @@ int main(int argc, char* argv[]) {
         case 'l' :
             emit_llvm = true;
             break;
-
-        default :
-            cout << "Invalid arguments." << endl;
-            exit(-1);
         }
+    }
+    if (emit_ast && emit_llvm) {
+        cout << "Error: flag -emit-ast and flag -emit-llvm cannot be set simultaneously.\n";
+        exit(-1);
     }
     if (optind == argc) {
         cout << "Error: no input file specified.\n";
