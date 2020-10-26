@@ -2,20 +2,11 @@
 
 %{  
     #include "ast.h"
-    #include "ekcc.h"
-    #include <iostream>
-    #include <string>
-
-    #include <getopt.h> 
-    #include <fstream>
-
-    using namespace std;
 
     // Declare stuff from Flex that Bison needs to know about:
     extern "C" {
         int yylex();
-        int yyparse();
-
+        
         extern FILE *yyin;
         extern char *yytext;
 
@@ -24,6 +15,7 @@
         int yywrap() {return 1;}
     }
 
+    int yyparse();
     prog *the_prog;
 %}
 
@@ -201,31 +193,6 @@ vdecl    : type varid                             {$$ = new vdecl($1, $2); }
          ;
 
 %%       
-
-int main(int argc, char* argv[]) {
-    if (argc > 1) { 
-        FILE *f = fopen(argv[1], "r");
-        if (!f) {
-            cout << "Input file: " << argv[1] << " not found.\n";
-            return -1;
-        }
-        yyin = f;
-    }
-
-    cout << "---" << endl;
-
-    do {
-        yyparse();
-    } while (!feof(yyin)); 
-
-    the_prog->yaml(cout, "");
-
-    cout << "..." << endl;
-
-    delete the_prog;
-    return 0;
-}
-
 void yyerror(const char *s) {
   cout << "Parse error!  Message: " << s << endl;
   exit(-1);
