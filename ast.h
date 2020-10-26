@@ -501,7 +501,7 @@ struct prog : public node {
         os << prefix << "funcs:" << endl;
         functions->yaml(os, prefix + "  ");
         if (!e) return;
-        os << prefix << "externs" << endl;
+        os << prefix << "externs: " << endl;
         e->yaml(os, prefix + "  ");
     }
 
