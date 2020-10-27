@@ -79,11 +79,14 @@
 %nonassoc "then" "else"
 
 // sequence of both within and between lines matter! 
-%left OR AND EQ 
+%right '=' 
+%left OR 
+%left AND 
+%left EQUAL 
 %left '<' '>' 
 %left '+' '-' 
 %left '*' '/'
-%right '=' "uminus" '!'
+%right "uminus" '!'
 
 %%
 /* Grammer rules of the parser */
