@@ -2,6 +2,7 @@
 #define _AST_H_
 
 #include <vector>
+#include <unordered_map>
 #include <iostream>
 
 using namespace std;
@@ -493,6 +494,9 @@ struct exts : public node {
 struct prog : public node {
     funcs *functions;
     exts *e;
+
+    unordered_map<string, func*> function_table;    // Table of all the declared functions.
+    unordered_map<string, ext*> extern_table;       // Table of all the external functions. 
 
     prog(funcs *f, exts *e = 0) : functions(f), e(e) {}
 
