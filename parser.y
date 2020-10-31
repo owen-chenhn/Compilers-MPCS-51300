@@ -175,11 +175,11 @@ varid    : IDENTIFIER                             {$$ = new id($1); free($1); }
 globid   : GIDENTIFIER                            {$$ = new id($1); free($1); }
          ; 
 
-type     : INT                                    {$$ = new type(type::t_int); } 
-         | CINT                                   {$$ = new type(type::t_cint); }
-         | FLOAT                                  {$$ = new type(type::t_float); }
-         | BOOL                                   {$$ = new type(type::t_bool); }
-         | VOID                                   {$$ = new type(type::t_void); }
+type     : INT                                    {$$ = new type(t_int); } 
+         | CINT                                   {$$ = new type(t_cint); }
+         | FLOAT                                  {$$ = new type(t_float); }
+         | BOOL                                   {$$ = new type(t_bool); }
+         | VOID                                   {$$ = new type(t_void); }
          | NOALIAS REF type                       {$$ = $3, $$->ref = true; $$->noalias = true;}              
          | REF type                               {$$ = $2, $$->ref = true; }
          ; 

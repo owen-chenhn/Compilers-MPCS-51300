@@ -8,9 +8,6 @@
 using namespace std;
 
 struct node {
-    static unordered_map<string, func*> function_table;    // Table of all the declared functions.
-    static unordered_map<string, ext*> extern_table;       // Table of all the external functions. 
-
     virtual void yaml(ostream &os, string prefix) = 0;
     virtual ~node() {}
     virtual void error(string err_msg) {
@@ -19,14 +16,16 @@ struct node {
     }
 };
 
+enum type_kind {
+    t_void = 0,
+    t_bool,
+    t_int,
+    t_cint,
+    t_float,
+};
+
 struct type {
-    enum type_kind {
-        t_void,
-        t_bool,
-        t_int,
-        t_cint,
-        t_float,
-    } kind;
+    enum type_kind kind;
     bool ref;
     bool noalias; // applies only to reference. 
 
@@ -104,8 +103,14 @@ struct vdecls : public node {
     }
 };
 
+
+
 struct exp : public node {
     type *exp_type;
+
+    // Check whether this expression is a variable (lvalue) or not (rvalue). 
+    // Only when exp is a struct varval, this function returns true. 
+    virtual bool is_variable() { return false; }
 };
 
 struct exps : public node {
@@ -152,6 +157,8 @@ struct varval : public exp {
 
     varval(id *v) : variable(v) {}
 
+    bool is_variable() { return true; }
+
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: varval" << endl;
         os << prefix << "var: " << variable->identifier << endl;
@@ -180,21 +187,8 @@ struct funccall : public exp {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0) : globid(gid), params(p) {
-        if (function_table.count(globid->identifier)) {
-            func *f = function_table[globid->identifier];
-            if (params->expressions.size() != f->variable_declaration)
+    funccall(id *gid, exps *p = 0);
 
-            exp_type = f->rt;
-
-        }
-        else if (extern_table.count(globid->identifier)) {
-            ext *e = extern_table[globid->identifier];
-
-            exp_type = e->rt;
-        }
-        else error("undeclared function '" + globid->identifier + "' is called.");
-    }
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: funccall" << endl;
         os << prefix << "globid: " << globid->identifier << endl;
@@ -292,7 +286,10 @@ struct castexp : public exp {
     ~castexp() { delete tp; delete expression; }
 };
 
-struct stmt : public node {}; 
+struct stmt : public node {
+    // Check whether this statement is a return statement.
+    virtual bool is_return() { return false; }
+}; 
 
 struct stmts : public node {
     vector<stmt *> statements;
@@ -332,6 +329,7 @@ struct ret : public stmt {
     exp *expression;
 
     ret(exp *e = 0) : expression(e) {}
+    bool is_return() { return true; }
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: ret" << endl;
@@ -442,17 +440,9 @@ struct func : public node {
     type *rt;
     id *globid;
     blk *block;
-    vdecls *variable_declaration;
+    vdecls *variable_declarations;
 
-    func(type *r, id *g, blk *b, vdecls *v = 0) : 
-        rt(r), globid(g), block(b), variable_declaration(v) 
-    {
-        if (extern_table.count(globid->identifier) || 
-            function_table.count(globid->identifier))
-            error("duplicate declaration of function '" + globid->identifier + "'.");
-        if (r->ref) error("function return type is a reference.");
-        function_table[globid->identifier] = this;
-    }
+    func(type *r, id *g, blk *b, vdecls *v = 0);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: func" << endl;
@@ -460,12 +450,12 @@ struct func : public node {
         os << prefix << "globid: " << globid->identifier << endl;
         os << prefix << "blk:" << endl;
         block->yaml(os, prefix + "  ");
-        if (!variable_declaration) return;
+        if (!variable_declarations) return;
         os << prefix << "vdecls:" << endl;
-        variable_declaration->yaml(os, prefix + "  ");
+        variable_declarations->yaml(os, prefix + "  ");
     }
 
-    ~func() { delete rt; delete globid; delete block; delete variable_declaration; }
+    ~func() { delete rt; delete globid; delete block; delete variable_declarations; }
 };
 
 struct funcs : public node {
@@ -488,14 +478,9 @@ struct funcs : public node {
 struct ext : public node {
     type *rt;
     id *globid;
-    tdecls *type_declares;
+    tdecls *type_declarations;
 
-    ext(type *r, id *g, tdecls *t = 0) : rt(r), globid(g), type_declares(t) {
-        if (globid->identifier == "run") error("function 'run' cannot be external.");
-        if (extern_table.count(globid->identifier)) error("duplicate declaration of function '" + globid->identifier + "'.");
-        if (r->ref) error("function return type is a reference.");
-        extern_table[globid->identifier] = this;
-    }
+    ext(type *r, id *g, tdecls *t = 0);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
@@ -503,10 +488,10 @@ struct ext : public node {
         os << prefix << "globid: " << globid->identifier << endl;
         if (!rt) return;
         os << prefix << "tdecls:" << endl;
-        type_declares->yaml(os, prefix + "  ");
+        type_declarations->yaml(os, prefix + "  ");
     } 
 
-    ~ext() { delete rt; delete globid; delete type_declares; }
+    ~ext() { delete rt; delete globid; delete type_declarations; }
 };
 
 struct exts : public node {
@@ -530,10 +515,7 @@ struct prog : public node {
     funcs *functions;
     exts *e;
 
-    prog(funcs *f, exts *e = 0) : functions(f), e(e) {
-        // Check there is a function named "run"
-        if (function_table.count("run") == 0) error("function 'run' not found.");
-    }
+    prog(funcs *f, exts *e = 0);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
@@ -544,7 +526,7 @@ struct prog : public node {
         e->yaml(os, prefix + "  ");
     }
 
-    ~prog() {delete functions; delete e; }
+    ~prog() { delete functions; delete e; }
 };
 
 #endif /* _AST_H_ */
