@@ -418,10 +418,10 @@ struct func : public node {
     type *rt;
     id *globid;
     blk *block;
-    vdecls *variable_declaration;
+    vdecls *variable_declarations;
 
     func(type *r, id *g, blk *b, vdecls *v = 0) : 
-        rt(r), globid(g), block(b), variable_declaration(v) {}
+        rt(r), globid(g), block(b), variable_declarations(v) {}
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: func" << endl;
@@ -429,12 +429,12 @@ struct func : public node {
         os << prefix << "globid: " << globid->identifier << endl;
         os << prefix << "blk:" << endl;
         block->yaml(os, prefix + "  ");
-        if (!variable_declaration) return;
+        if (!variable_declarations) return;
         os << prefix << "vdecls:" << endl;
-        variable_declaration->yaml(os, prefix + "  ");
+        variable_declarations->yaml(os, prefix + "  ");
     }
 
-    ~func() { delete rt; delete globid; delete block; delete variable_declaration; }
+    ~func() { delete rt; delete globid; delete block; delete variable_declarations; }
 };
 
 struct funcs : public node {
@@ -457,9 +457,9 @@ struct funcs : public node {
 struct ext : public node {
     type *rt;
     id *globid;
-    tdecls *type_declares;
+    tdecls *type_declarations;
 
-    ext(type *r, id *g, tdecls *t = 0) : rt(r), globid(g), type_declares(t) {}
+    ext(type *r, id *g, tdecls *t = 0) : rt(r), globid(g), type_declarations(t) {}
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
@@ -467,10 +467,10 @@ struct ext : public node {
         os << prefix << "globid: " << globid->identifier << endl;
         if (!rt) return;
         os << prefix << "tdecls:" << endl;
-        type_declares->yaml(os, prefix + "  ");
+        type_declarations->yaml(os, prefix + "  ");
     } 
 
-    ~ext() { delete rt; delete globid; delete type_declares; }
+    ~ext() { delete rt; delete globid; delete type_declarations; }
 };
 
 struct exts : public node {
