@@ -104,7 +104,9 @@ struct vdecls : public node {
     }
 };
 
-struct exp : public node {};
+struct exp : public node {
+    type *exp_type;
+};
 
 struct exps : public node {
     vector<exp *> expressions;
@@ -181,10 +183,15 @@ struct funccall : public exp {
     funccall(id *gid, exps *p = 0) : globid(gid), params(p) {
         if (function_table.count(globid->identifier)) {
             func *f = function_table[globid->identifier];
-            
+            if (params->expressions.size() != f->variable_declaration)
+
+            exp_type = f->rt;
+
         }
         else if (extern_table.count(globid->identifier)) {
             ext *e = extern_table[globid->identifier];
+
+            exp_type = e->rt;
         }
         else error("undeclared function '" + globid->identifier + "' is called.");
     }
