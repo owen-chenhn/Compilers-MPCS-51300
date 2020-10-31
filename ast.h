@@ -13,6 +13,10 @@ struct node {
 
     virtual void yaml(ostream &os, string prefix) = 0;
     virtual ~node() {}
+    virtual void error(string err_msg) {
+        cout << "error: " << err_msg << endl;
+        exit(1);
+    }
 };
 
 struct type {
