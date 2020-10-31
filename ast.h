@@ -2,6 +2,7 @@
 #define _AST_H_
 
 #include <vector>
+#include <unordered_map>
 #include <iostream>
 
 using namespace std;
@@ -9,6 +10,10 @@ using namespace std;
 struct node {
     virtual void yaml(ostream &os, string prefix) = 0;
     virtual ~node() {}
+    virtual void error(string err_msg) {
+        cout << "error: " << err_msg << endl;
+        exit(1);
+    }
 };
 
 struct type {
