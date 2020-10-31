@@ -6,8 +6,8 @@
 
 using namespace std;
 
-static unordered_map<string, void *> function_table;    // Table of all the declared functions.
-static unordered_map<string, void *> extern_table;       // Table of all the external functions. make
+static unordered_map<string, func *> function_table;    // Table of all the declared functions.
+static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 
 static const string type_names[5] = {
     "void", 
@@ -19,7 +19,7 @@ static const string type_names[5] = {
 
 funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {
     if (function_table.count(globid->identifier)) {
-        func *f = (func *) function_table[globid->identifier];
+        func *f = function_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
                     num_decls = f->variable_declarations->variables.size();
         if (num_params != num_decls) 
@@ -29,7 +29,7 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {
         for (unsigned i = 0; i < num_decls; i++) {
             exp *expr = params->expressions[i];
             vdecl *var_declare = f->variable_declarations->variables[i];
-            enum type_kind exp_tp = expr->exp_type->kind, decl_tp = var_declare->tp->kind;
+            type::type_kind exp_tp = expr->exp_type->kind, decl_tp = var_declare->tp->kind;
             if (exp_tp != decl_tp) 
                 error("Function '" + globid->identifier + 
                         "' got wrong argument type. Argument " + to_string(i+1) + " should be " 
@@ -42,7 +42,7 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {
         exp_type = f->rt;
     }
     else if (extern_table.count(globid->identifier)) {
-        ext *e = (ext *) extern_table[globid->identifier];
+        ext *e = extern_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
                     num_decls = e->type_declarations->types.size();
         if (num_params != num_decls) 
@@ -52,7 +52,7 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {
         for (unsigned i = 0; i < num_decls; i++) {
             exp *expr = params->expressions[i];
             type *tp_declare = e->type_declarations->types[i];
-            enum type_kind exp_tp = expr->exp_type->kind, decl_tp = tp_declare->kind;
+            type::type_kind exp_tp = expr->exp_type->kind, decl_tp = tp_declare->kind;
             if (exp_tp != decl_tp) 
                 error("Function '" + globid->identifier + 
                         "' got wrong argument type. Argument " + to_string(i+1) + " should be " 
@@ -77,18 +77,18 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     if (rt->ref) error("Function return type is a reference.");
     if (globid->identifier == "run") {
         // Funtion "run" must return int/cint and take no arguments.
-        if (rt->kind != t_int && rt->kind != t_cint) 
+        if (rt->kind != type::t_int && rt->kind != type::t_cint) 
             error("Funtion 'run' must have return type int or cint.");
         if (v != NULL) error("Funtion 'run' cannot have arguments.");
     }
     // Check return type
-    if (block->statements == NULL && rt->kind != t_void) 
+    if (block->statements == NULL && rt->kind != type::t_void) 
         error("Funtion '" + globid->identifier + "' has wrong return type. " + 
         "Empty body but non-void return type.");
     else {
         for (stmt *st : block->statements->statements) {
             if (st->is_return()) {
-                enum type_kind ret_type = ((ret *) st)->expression->exp_type->kind;
+                type::type_kind ret_type = ((ret *) st)->expression->exp_type->kind;
                 if (ret_type != rt->kind) 
                     error("Funtion '" + globid->identifier + "' has wrong return type. " + 
                     "Expect " + type_names[rt->kind] + " but get " + 
@@ -96,7 +96,7 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             }
         }
     }
-    function_table[globid->identifier] = (void *) this;
+    function_table[globid->identifier] = this;
 }
 
 
@@ -104,7 +104,7 @@ ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     if (globid->identifier == "run") error("Function 'run' cannot be external.");
     if (extern_table.count(globid->identifier)) error("Duplicate declaration of function '" + globid->identifier + "'.");
     if (rt->ref) error("Function return type is a reference.");
-    extern_table[globid->identifier] = (void *) this;
+    extern_table[globid->identifier] = this;
 }
 
 

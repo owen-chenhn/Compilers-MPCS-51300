@@ -16,16 +16,14 @@ struct node {
     }
 };
 
-enum type_kind {
-    t_void = 0,
-    t_bool,
-    t_int,
-    t_cint,
-    t_float,
-};
-
 struct type {
-    enum type_kind kind;
+    enum type_kind {
+        t_void = 0,
+        t_bool,
+        t_int,
+        t_cint,
+        t_float,
+    } kind;
     bool ref;
     bool noalias; // applies only to reference. 
 
