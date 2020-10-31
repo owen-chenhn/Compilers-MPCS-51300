@@ -8,6 +8,9 @@
 using namespace std;
 
 struct node {
+    static unordered_map<string, func*> function_table;    // Table of all the declared functions.
+    static unordered_map<string, ext*> extern_table;       // Table of all the external functions. 
+
     virtual void yaml(ostream &os, string prefix) = 0;
     virtual ~node() {}
 };
@@ -171,7 +174,16 @@ struct funccall : public exp {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0) : globid(gid), params(p) {}
+    funccall(id *gid, exps *p = 0) : globid(gid), params(p) {
+        if (function_table.count(globid->identifier)) {
+            func *f = function_table[globid->identifier];
+            
+        }
+        else if (extern_table.count(globid->identifier)) {
+            ext *e = extern_table[globid->identifier];
+        }
+        else error("undeclared function '" + globid->identifier + "' is called.");
+    }
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: funccall" << endl;
         os << prefix << "globid: " << globid->identifier << endl;
@@ -422,7 +434,14 @@ struct func : public node {
     vdecls *variable_declaration;
 
     func(type *r, id *g, blk *b, vdecls *v = 0) : 
-        rt(r), globid(g), block(b), variable_declaration(v) {}
+        rt(r), globid(g), block(b), variable_declaration(v) 
+    {
+        if (extern_table.count(globid->identifier) || 
+            function_table.count(globid->identifier))
+            error("duplicate declaration of function '" + globid->identifier + "'.");
+        if (r->ref) error("function return type is a reference.");
+        function_table[globid->identifier] = this;
+    }
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: func" << endl;
@@ -460,7 +479,12 @@ struct ext : public node {
     id *globid;
     tdecls *type_declares;
 
-    ext(type *r, id *g, tdecls *t = 0) : rt(r), globid(g), type_declares(t) {}
+    ext(type *r, id *g, tdecls *t = 0) : rt(r), globid(g), type_declares(t) {
+        if (globid->identifier == "run") error("function 'run' cannot be external.");
+        if (extern_table.count(globid->identifier)) error("duplicate declaration of function '" + globid->identifier + "'.");
+        if (r->ref) error("function return type is a reference.");
+        extern_table[globid->identifier] = this;
+    }
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
@@ -495,10 +519,10 @@ struct prog : public node {
     funcs *functions;
     exts *e;
 
-    unordered_map<string, func*> function_table;    // Table of all the declared functions.
-    unordered_map<string, ext*> extern_table;       // Table of all the external functions. 
-
-    prog(funcs *f, exts *e = 0) : functions(f), e(e) {}
+    prog(funcs *f, exts *e = 0) : functions(f), e(e) {
+        // Check there is a function named "run"
+        if (function_table.count("run") == 0) error("function 'run' not found.");
+    }
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
