@@ -18,7 +18,7 @@ struct node {
 
 struct type {
     enum type_kind {
-        t_void,
+        t_void = 0,
         t_bool,
         t_int,
         t_cint,
@@ -101,7 +101,15 @@ struct vdecls : public node {
     }
 };
 
-struct exp : public node {};
+
+
+struct exp : public node {
+    type *exp_type;
+
+    // Check whether this expression is a variable (lvalue) or not (rvalue). 
+    // Only when exp is a struct varval, this function returns true. 
+    virtual bool is_variable() { return false; }
+};
 
 struct exps : public node {
     vector<exp *> expressions;
@@ -147,6 +155,8 @@ struct varval : public exp {
 
     varval(id *v) : variable(v) {}
 
+    bool is_variable() { return true; }
+
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: varval" << endl;
         os << prefix << "var: " << variable->identifier << endl;
@@ -175,7 +185,8 @@ struct funccall : public exp {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0) : globid(gid), params(p) {}
+    funccall(id *gid, exps *p = 0);
+
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: funccall" << endl;
         os << prefix << "globid: " << globid->identifier << endl;
@@ -273,7 +284,10 @@ struct castexp : public exp {
     ~castexp() { delete tp; delete expression; }
 };
 
-struct stmt : public node {}; 
+struct stmt : public node {
+    // Check whether this statement is a return statement.
+    virtual bool is_return() { return false; }
+}; 
 
 struct stmts : public node {
     vector<stmt *> statements;
@@ -313,6 +327,7 @@ struct ret : public stmt {
     exp *expression;
 
     ret(exp *e = 0) : expression(e) {}
+    bool is_return() { return true; }
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: ret" << endl;
@@ -425,8 +440,7 @@ struct func : public node {
     blk *block;
     vdecls *variable_declarations;
 
-    func(type *r, id *g, blk *b, vdecls *v = 0) : 
-        rt(r), globid(g), block(b), variable_declarations(v) {}
+    func(type *r, id *g, blk *b, vdecls *v = 0);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: func" << endl;
@@ -464,7 +478,7 @@ struct ext : public node {
     id *globid;
     tdecls *type_declarations;
 
-    ext(type *r, id *g, tdecls *t = 0) : rt(r), globid(g), type_declarations(t) {}
+    ext(type *r, id *g, tdecls *t = 0);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
@@ -499,7 +513,7 @@ struct prog : public node {
     funcs *functions;
     exts *e;
 
-    prog(funcs *f, exts *e = 0) : functions(f), e(e) {}
+    prog(funcs *f, exts *e = 0);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
@@ -510,7 +524,7 @@ struct prog : public node {
         e->yaml(os, prefix + "  ");
     }
 
-    ~prog() {delete functions; delete e; }
+    ~prog() { delete functions; delete e; }
 };
 
 #endif /* _AST_H_ */
