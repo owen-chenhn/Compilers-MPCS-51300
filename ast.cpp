@@ -36,13 +36,60 @@ vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
     vdecl_table[var->identifier] = this;
 }
 
+void vdecl::yaml(ostream &os, string prefix) {
+        os << prefix << "node: vdecl" << endl;
+        os << prefix << "type: " << tp->name() << endl;
+        os << prefix << "var: " << variable->identifier << endl;
+}
+
+void tdecls::yaml(ostream &os, string prefix) {
+        os << prefix << "name: tdecls" << endl;
+        os << prefix << "types: " << endl;
+        for (auto t : types) {
+            os << prefix << "  - " << t->name() << endl;
+        }
+}
+
+void vdecls::yaml(ostream &os, string prefix) {
+        os << prefix << "name: vdecls" << endl;
+        os << prefix << "vars:" << endl;
+        for (auto var : variables) {
+            os << prefix << "  -" << endl;
+            var->yaml(os, prefix + "    ");
+        }
+}
+
+void exps::yaml(ostream &os, string prefix) {
+        os << prefix << "name: exps" << endl;
+        os << prefix << "exps:" << endl;
+        for (auto e : expressions) {
+            os << prefix << "  -" << endl;
+            e->yaml(os, prefix + "    ");
+        }
+}
+
 lit::lit(int i): it(i), exp(new type(type::t_int)) {}
 
+void lit::yaml(ostream &os, string prefix) {
+        os << prefix << "name: lit" << endl;
+        os << prefix << "value: " << it << endl;
+}
+
 flit::flit(float f): flt(f), exp(new type(type::t_int)) {}
+
+void flit::yaml(ostream &os, string prefix) {
+        os << prefix << "name: flit" << endl;
+        os << prefix << "value: " << flt << endl;
+}
 
 varval::varval(id *v) : variable(v), exp(new type(type::t_int)) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
+}
+
+void varval::yaml(ostream &os, string prefix) {
+        os << prefix << "name: varval" << endl;
+        os << prefix << "var: " << variable->identifier << endl;
 }
 
 assign::assign(id *v, exp *e): variable(v), expression(e), exp(e->exp_type) {
@@ -55,11 +102,12 @@ assign::assign(id *v, exp *e): variable(v), expression(e), exp(e->exp_type) {
     }
 }
 
-uop::uop(uop_kind kd, exp *e): kind(kd), expression(e), exp(e->exp_type) {}
-
-binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {}
-
-castexp::castexp(type *t, exp *e) : tp(t), expression(e), exp(t) {}
+void assign::yaml(ostream &os, string prefix) {
+        os << prefix << "name: assign" << endl;
+        os << prefix << "var: " << variable->identifier << endl;
+        os << prefix << "exp:" << endl;
+        expression->yaml(os, prefix + "  ");
+}
 
 funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type::t_int)) {
     if (function_table.count(globid->identifier)) {
@@ -111,6 +159,109 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type
     else error("Undeclared function '" + globid->identifier + "' is called.");
 }
 
+void funccall::yaml(ostream &os, string prefix) {
+        os << prefix << "name: funccall" << endl;
+        os << prefix << "globid: " << globid->identifier << endl;
+        if (!params) return;
+        os << prefix << "params:" << endl;
+        params->yaml(os, prefix + "  ");
+}
+
+uop::uop(uop_kind kd, exp *e): kind(kd), expression(e), exp(e->exp_type) {}
+
+void uop::yaml(ostream &os, string prefix) {
+        os << prefix << "name: uop" << endl;
+        os << prefix << "op: " << kind_name() << endl; 
+        os << prefix << "exp:" << endl;
+        expression->yaml(os, prefix + "  ");
+}
+
+binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {}
+
+void binop::yaml(ostream &os, string prefix) {
+        os << prefix << "name: binop" << endl;
+        os << prefix << "op: " << kind_name() << endl;
+        os << prefix << "lhs:" << endl;
+        lhs->yaml(os, prefix + "  ");
+        os << prefix << "rhs:" << endl;
+        rhs->yaml(os, prefix + "  ");
+}
+
+castexp::castexp(type *t, exp *e) : tp(t), expression(e), exp(t) {}
+
+void castexp::yaml(ostream &os, string prefix) {
+        os << prefix << "name: caststmt" << endl;
+        os << prefix << "type: " << tp->name() << endl;
+        os << prefix << "exp:" << endl;
+        expression->yaml(os, prefix + "  ");
+}
+
+void stmts::yaml(ostream &os, string prefix) {
+        os << prefix << "name: stmts" << endl;
+        os << prefix << "stmts:" << endl;
+        for (auto s : statements) {
+            os << prefix << "  -" << endl;
+            s->yaml(os, prefix + "    ");
+        }
+}
+
+void blk::yaml(ostream &os, string prefix) {
+        os << prefix << "name: blk" << endl;
+        if (!statements) return;
+        os << prefix << "contents:" << endl;
+        statements->yaml(os, prefix + "  ");
+}
+
+void ret::yaml(ostream &os, string prefix) {
+        os << prefix << "name: ret" << endl;
+        if (!expression) return;
+        os << prefix << "exp:" << endl;
+        expression->yaml(os, prefix + "  ");
+}
+
+void vdeclstmt::yaml(ostream &os, string prefix) {
+        os << prefix << "name: vardeclstmt" << endl;
+        os << prefix << "vdecl:" << endl;
+        variable->yaml(os, prefix + "  ");
+        os << prefix << "exp: " << endl;
+        expression->yaml(os, prefix + "  ");
+}   
+
+void expstmt::yaml(ostream &os, string prefix) {
+        os << prefix << "name: expstmt" << endl;
+        os << prefix << "exp:" << endl;
+        expression->yaml(os, prefix + "  ");
+}
+
+void whilestmt::yaml(ostream &os, string prefix) {
+        os << prefix << "name: while" << endl;
+        os << prefix << "cond: " << endl;
+        condition->yaml(os, prefix + "  ");
+        os << prefix << "stmt: " << endl;
+        statement->yaml(os, prefix + "  ");
+}
+
+void ifstmt::yaml(ostream &os, string prefix) {
+        os << prefix << "name: if" << endl;
+        os << prefix << "cond:" << endl;
+        condition->yaml(os, prefix + "  ");
+        os << prefix << "stmt:" << endl;
+        statement->yaml(os, prefix + "  ");
+        if (!else_statement) return;
+        os << prefix << "else_stmt:" << endl;
+        else_statement->yaml(os, prefix + "  ");
+}
+
+void print::yaml(ostream &os, string prefix) {
+        os << prefix << "name: print" << endl;
+        os << prefix << "exp:" << endl;
+        expression->yaml(os, prefix + "  ");
+}
+
+void printslit::yaml(ostream &os, string prefix) {
+        os << prefix << "name: printslit" << endl;
+        os << prefix << "string: " << str << endl;
+}
 
 func::func(type *r, id *g, blk *b, vdecls *v) : 
     rt(r), globid(g), block(b), variable_declarations(v) 
@@ -143,6 +294,25 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     function_table[globid->identifier] = this;
 }
 
+void func::yaml(ostream &os, string prefix) {
+        os << prefix << "name: func" << endl;
+        os << prefix << "ret_type: " << rt->name() << endl;
+        os << prefix << "globid: " << globid->identifier << endl;
+        os << prefix << "blk:" << endl;
+        block->yaml(os, prefix + "  ");
+        if (!variable_declarations) return;
+        os << prefix << "vdecls:" << endl;
+        variable_declarations->yaml(os, prefix + "  ");
+}
+
+void funcs::yaml(ostream &os, string prefix) {
+        os << prefix << "name: funcs" << endl;
+        os << prefix << "funcs:" << endl;
+        for (auto fun : functions) {
+            os << prefix << "  -" << endl;
+            fun->yaml(os, prefix + "    ");
+        }
+}
 
 ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     if (globid->identifier == "run") error("Function 'run' cannot be external.");
@@ -151,8 +321,34 @@ ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     extern_table[globid->identifier] = this;
 }
 
+void ext::yaml(ostream &os, string prefix) {
+        os << prefix << "name: extern" << endl;
+        os << prefix << "ret_type: " << rt->name() << endl;
+        os << prefix << "globid: " << globid->identifier << endl;
+        if (!rt) return;
+        os << prefix << "tdecls:" << endl;
+        type_declarations->yaml(os, prefix + "  ");
+} 
+
+void exts::yaml(ostream &os, string prefix) {
+        os << prefix << "name: externs" << endl;
+        os << prefix << "externs: " << endl;
+        for (auto e : externs) {
+            os << prefix << "  -" << endl;
+            e->yaml(os, prefix + "    ");
+        }
+}
 
 prog::prog(funcs *f, exts *e) : functions(f), e(e) {
     // Check there is a function named "run"
     if (function_table.count("run") == 0) error("Function 'run' not found.");
+}
+
+void prog::yaml(ostream &os, string prefix) {
+        os << prefix << "name: prog" << endl;
+        os << prefix << "funcs:" << endl;
+        functions->yaml(os, prefix + "  ");
+        if (!e) return;
+        os << prefix << "externs: " << endl;
+        e->yaml(os, prefix + "  ");
 }
