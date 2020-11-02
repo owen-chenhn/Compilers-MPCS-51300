@@ -57,7 +57,7 @@ struct vdecl : public node {
     type *tp; 
     id *variable;
 
-    vdecl(type *t, id *var) : tp(t), variable(var) {}
+    vdecl(type *t, id *var);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "node: vdecl" << endl;

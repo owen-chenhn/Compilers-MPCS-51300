@@ -17,6 +17,10 @@ static const string type_names[5] = {
     "float"
 };
 
+vdecl::vdecl(type *t, id *var) :tp(t), variable(var) {
+    if (t->kind == type::t_void) error("Variable type may not be void.");
+}
+
 funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {
     if (function_table.count(globid->identifier)) {
         func *f = function_table[globid->identifier];
