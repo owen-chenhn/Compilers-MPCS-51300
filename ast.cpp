@@ -17,6 +17,17 @@ static const string type_names[5] = {
     "float"
 };
 
+void type::check_and_make_ref() {
+    if (ref) error("Ref type may not refer to a reference.");
+    if (kind == type::t_void) error("Ref type may not refer to void type.");
+    ref = true;
+}
+
+void type::error(const string& err_msg) {
+    cout << "error: " << err_msg << endl;
+    exit(1);
+}
+
 vdecl::vdecl(type *t, id *var) :tp(t), variable(var) {
     if (t->kind == type::t_void) error("Variable type may not be void.");
 }

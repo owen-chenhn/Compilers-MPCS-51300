@@ -44,6 +44,10 @@ struct type {
 
         return nm;
     }
+
+    void check_and_make_ref();
+
+    void error(const string& err_msg);
 };
 
 // type of varid and globid
