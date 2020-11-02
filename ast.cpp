@@ -3,11 +3,13 @@
 #include <vector>
 #include <unordered_map>
 #include <iostream>
+#include <type_traits>
 
 using namespace std;
 
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
+static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
 
 static const string type_names[5] = {
     "void", 
@@ -28,8 +30,20 @@ void type::error(const string& err_msg) {
     exit(1);
 }
 
-vdecl::vdecl(type *t, id *var) :tp(t), variable(var) {
+vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
+    if (vdecl_table.count(var->identifier)) error("Duplicate variable declaration: " + var->identifier + ".");  
     if (t->kind == type::t_void) error("Variable type may not be void.");
+    vdecl_table[var->identifier] = this;
+}
+
+assign::assign(id *v, exp *e): variable(v), expression(e) {
+    if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
+    
+    type *var_type = vdecl_table[v->identifier]->tp; 
+
+    if (var_type->ref) {
+        if (!is_same<varval, decltype(*e)>::value) error("Ref variable initilization expression must be a variable.");
+    }
 }
 
 funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {

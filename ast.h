@@ -173,7 +173,7 @@ struct assign : public exp {
     id *variable;
     exp *expression;
 
-    assign(id *v, exp *e) : variable(v), expression(e) {}
+    assign(id *v, exp *e);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: assign" << endl;
