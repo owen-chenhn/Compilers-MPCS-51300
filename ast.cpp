@@ -11,14 +11,6 @@ static unordered_map<string, func *> function_table;    // Table of all the decl
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
 
-static const string type_names[5] = {
-    "void", 
-    "bool", 
-    "int", 
-    "cint", 
-    "float"
-};
-
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
     if (kind == type::t_void) error("Ref type may not refer to void type.");
@@ -72,6 +64,7 @@ lit::lit(int i): it(i), exp(new type(type::t_int)) {}
 
 void lit::yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "value: " << it << endl;
 }
 
@@ -79,6 +72,7 @@ flit::flit(float f): flt(f), exp(new type(type::t_int)) {}
 
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "value: " << flt << endl;
 }
 
@@ -89,6 +83,7 @@ varval::varval(id *v) : variable(v), exp(new type(type::t_int)) {
 
 void varval::yaml(ostream &os, string prefix) {
         os << prefix << "name: varval" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "var: " << variable->identifier << endl;
 }
 
@@ -104,6 +99,7 @@ assign::assign(id *v, exp *e): variable(v), expression(e), exp(e->exp_type) {
 
 void assign::yaml(ostream &os, string prefix) {
         os << prefix << "name: assign" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "var: " << variable->identifier << endl;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
@@ -120,13 +116,13 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type
                     " but get " + to_string(num_params) + ".");
         for (unsigned i = 0; i < num_decls; i++) {
             exp *expr = params->expressions[i];
-            vdecl *var_declare = f->variable_declarations->variables[i];
-            type::type_kind exp_tp = expr->exp_type->kind, decl_tp = var_declare->tp->kind;
-            if (exp_tp != decl_tp) 
+            vdecl *var_declared = f->variable_declarations->variables[i];
+            type *exp_tp = expr->exp_type, *decl_tp = var_declared->tp;
+            if (exp_tp->kind != decl_tp->kind) 
                 error("Function '" + globid->identifier + 
                         "' got wrong argument type. Argument " + to_string(i+1) + " should be " 
-                        + type_names[decl_tp] + " but get " + type_names[exp_tp]);
-            if (var_declare->tp->ref && !expr->is_variable()) 
+                        + decl_tp->name() + " but got " + exp_tp->name());
+            if (decl_tp->ref && !expr->is_variable()) 
                 error("Function '" + globid->identifier + 
                         "' expects variable (lvalue) for its reference argument " 
                         + to_string(i+1) + ".");
@@ -143,13 +139,13 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type
                     " but get " + to_string(num_params) + ".");
         for (unsigned i = 0; i < num_decls; i++) {
             exp *expr = params->expressions[i];
-            type *tp_declare = e->type_declarations->types[i];
-            type::type_kind exp_tp = expr->exp_type->kind, decl_tp = tp_declare->kind;
-            if (exp_tp != decl_tp) 
+            type *tp_declared = e->type_declarations->types[i];
+            type *exp_tp = expr->exp_type, *decl_tp = tp_declared;
+            if (exp_tp->kind != decl_tp->kind) 
                 error("Function '" + globid->identifier + 
                         "' got wrong argument type. Argument " + to_string(i+1) + " should be " 
-                        + type_names[decl_tp] + " but get " + type_names[exp_tp]);
-            if (tp_declare->ref && !expr->is_variable()) 
+                        + tp_declared->name() + " but get " + exp_tp->name());
+            if (tp_declared->ref && !expr->is_variable()) 
                 error("Function '" + globid->identifier + 
                         "' expects variable (lvalue) for its reference argument " 
                         + to_string(i+1) + ".");
@@ -161,6 +157,7 @@ funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type
 
 void funccall::yaml(ostream &os, string prefix) {
         os << prefix << "name: funccall" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "globid: " << globid->identifier << endl;
         if (!params) return;
         os << prefix << "params:" << endl;
@@ -171,6 +168,7 @@ uop::uop(uop_kind kd, exp *e): kind(kd), expression(e), exp(e->exp_type) {}
 
 void uop::yaml(ostream &os, string prefix) {
         os << prefix << "name: uop" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "op: " << kind_name() << endl; 
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
@@ -180,6 +178,7 @@ binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(ri
 
 void binop::yaml(ostream &os, string prefix) {
         os << prefix << "name: binop" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "op: " << kind_name() << endl;
         os << prefix << "lhs:" << endl;
         lhs->yaml(os, prefix + "  ");
@@ -191,13 +190,14 @@ castexp::castexp(type *t, exp *e) : tp(t), expression(e), exp(t) {}
 
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
+        os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "type: " << tp->name() << endl;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
 }
 
 void stmts::yaml(ostream &os, string prefix) {
-        os << prefix << "name: stmts" << endl;
+        os << prefix << "name: stmts" << endl;       
         os << prefix << "stmts:" << endl;
         for (auto s : statements) {
             os << prefix << "  -" << endl;
@@ -206,7 +206,7 @@ void stmts::yaml(ostream &os, string prefix) {
 }
 
 void blk::yaml(ostream &os, string prefix) {
-        os << prefix << "name: blk" << endl;
+        os << prefix << "name: blk" << endl;       
         if (!statements) return;
         os << prefix << "contents:" << endl;
         statements->yaml(os, prefix + "  ");
@@ -283,11 +283,11 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     else {
         for (stmt *st : block->statements->statements) {
             if (st->is_return()) {
-                type::type_kind ret_type = ((ret *) st)->expression->exp_type->kind;
-                if (ret_type != rt->kind) 
+                type *ret_type = ((ret *) st)->expression->exp_type;
+                if (ret_type->kind != rt->kind) 
                     error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-                    "Expect " + type_names[rt->kind] + " but get " + 
-                    type_names[ret_type] + ".");
+                    "Expect " + rt->name() + " but get " + 
+                    ret_type->name() + ".");
             }
         }
     }
