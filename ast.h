@@ -110,6 +110,8 @@ struct vdecls : public node {
 struct exp : public node {
     type *exp_type;
 
+    exp(type *t): exp_type(t) {}
+
     // Check whether this expression is a variable (lvalue) or not (rvalue). 
     // Only when exp is a struct varval, this function returns true. 
     virtual bool is_variable() { return false; }
@@ -135,7 +137,7 @@ struct exps : public node {
 struct lit : public exp {
     int it;
 
-    lit(int i) : it(i) {}
+    lit(int i);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
@@ -146,7 +148,7 @@ struct lit : public exp {
 struct flit : public exp {
     float flt;
 
-    flit(float f) : flt(f) {}
+    flit(float f);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
@@ -157,7 +159,7 @@ struct flit : public exp {
 struct varval : public exp {
     id *variable;
 
-    varval(id *v) : variable(v) {}
+    varval(id *v);
 
     bool is_variable() { return true; }
 
@@ -210,7 +212,7 @@ struct uop : public exp {
 
     exp *expression;
 
-    uop(uop_kind kd, exp *e) : kind(kd), expression(e) {}
+    uop(uop_kind kd, exp *e);
 
     const char *kind_name() {
         switch (kind) {
@@ -244,7 +246,7 @@ struct binop : public exp {
 
     exp *lhs, *rhs; 
 
-    binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right) {}
+    binop(binop_kind kd, exp *left, exp *right);
 
     const char *kind_name() {
         switch (kind) {
@@ -276,7 +278,7 @@ struct castexp : public exp {
     type *tp;
     exp *expression;
 
-    castexp(type *t, exp *e) : tp(t), expression(e) {}
+    castexp(type *t, exp *e);
 
     virtual void yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;

@@ -36,7 +36,16 @@ vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
     vdecl_table[var->identifier] = this;
 }
 
-assign::assign(id *v, exp *e): variable(v), expression(e) {
+lit::lit(int i): it(i), exp(new type(type::t_int)) {}
+
+flit::flit(float f): flt(f), exp(new type(type::t_int)) {}
+
+varval::varval(id *v) : variable(v), exp(new type(type::t_int)) {
+    if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
+    exp_type = vdecl_table[v->identifier]->tp;
+}
+
+assign::assign(id *v, exp *e): variable(v), expression(e), exp(e->exp_type) {
     if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
     
     type *var_type = vdecl_table[v->identifier]->tp; 
@@ -46,7 +55,13 @@ assign::assign(id *v, exp *e): variable(v), expression(e) {
     }
 }
 
-funccall::funccall(id *gid, exps *p) : globid(gid), params(p) {
+uop::uop(uop_kind kd, exp *e): kind(kd), expression(e), exp(e->exp_type) {}
+
+binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {}
+
+castexp::castexp(type *t, exp *e) : tp(t), expression(e), exp(t) {}
+
+funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type::t_int)) {
     if (function_table.count(globid->identifier)) {
         func *f = function_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
