@@ -170,7 +170,7 @@ struct uop : public exp {
 
     uop(uop_kind kd, exp *e);
 
-    const char *kind_name() {
+    string kind_name() {
         switch (kind) {
             case uop_not   : return "not"  ;
             case uop_minus : return "minus";
@@ -199,7 +199,7 @@ struct binop : public exp {
 
     binop(binop_kind kd, exp *left, exp *right);
 
-    const char *kind_name() {
+    string kind_name() {
         switch (kind) {
             case bop_mul : return "mul";
             case bop_div : return "div";

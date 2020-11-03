@@ -174,7 +174,17 @@ void uop::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {}
+binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {
+    if (left->exp_type->kind != right->exp_type->kind) {
+        error("Types should be the same on both sides of " +
+              this->kind_name() + 
+              " but got " + 
+              left->exp_type->name() + 
+              " and " + 
+              right->exp_type->name() + 
+              " instead.");
+    }
+}
 
 void binop::yaml(ostream &os, string prefix) {
         os << prefix << "name: binop" << endl;
