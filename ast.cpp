@@ -166,7 +166,14 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
-uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {}
+uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {
+    if (kd == uop_not && e->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
+    if (kd == uop_minus) {
+        if (e->exp_type->kind != type::t_int && 
+            e->exp_type->kind != type::t_cint && 
+            e->exp_type->kind != type::t_float) error("Signed negation (-) must be applied to numeric types.");
+    }
+}
 
 void uop::yaml(ostream &os, string prefix) {
         os << prefix << "name: uop" << endl;
@@ -176,7 +183,7 @@ void uop::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-binop::binop(binop_kind kd, exp *left, exp *right) : exp(left->exp_type), kind(kd), lhs(left), rhs(right) {
+binop::binop(binop_kind kd, exp *left, exp *right) : exp(nullptr), kind(kd), lhs(left), rhs(right) {
     if (left->exp_type->kind != right->exp_type->kind) {
         error("Types should be the same on both sides of " +
               this->kind_name() + 
@@ -185,6 +192,14 @@ binop::binop(binop_kind kd, exp *left, exp *right) : exp(left->exp_type), kind(k
               " and " + 
               right->exp_type->name() + 
               " instead.");
+    }
+
+    switch (kind) {
+    case bop_add:
+    case bop_sub:
+    case bop_mul:
+    case bop_div: exp_type = left->exp_type; break;
+    default: exp_type = new type(type::t_bool);
     }
 }
 
@@ -224,7 +239,7 @@ void blk::yaml(ostream &os, string prefix) {
         statements->yaml(os, prefix + "  ");
 }
 
-ret::ret(exp *e = 0) : expression(e) {
+ret::ret(exp *e) : expression(e) {
     if (e->exp_type->ref) error("Function should not return a reference.");
 }
 
