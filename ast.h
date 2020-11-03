@@ -44,6 +44,10 @@ struct type {
 
         return nm;
     }
+
+    void check_and_make_ref();
+
+    void error(const string& err_msg);
 };
 
 // type of varid and globid
@@ -57,13 +61,9 @@ struct vdecl : public node {
     type *tp; 
     id *variable;
 
-    vdecl(type *t, id *var) : tp(t), variable(var) {}
+    vdecl(type *t, id *var);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "node: vdecl" << endl;
-        os << prefix << "type: " << tp->name() << endl;
-        os << prefix << "var: " << variable->identifier << endl;
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~vdecl() { delete tp; delete variable; }
 };
@@ -71,13 +71,7 @@ struct vdecl : public node {
 struct tdecls : public node {
     vector<type *> types;
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: tdecls" << endl;
-        os << prefix << "types: " << endl;
-        for (auto t : types) {
-            os << prefix << "  - " << t->name() << endl;
-        }
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~tdecls() {
         for (auto t : types) { delete t; }
@@ -87,14 +81,7 @@ struct tdecls : public node {
 struct vdecls : public node {
     vector<vdecl *> variables;
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: vdecls" << endl;
-        os << prefix << "vars:" << endl;
-        for (auto var : variables) {
-            os << prefix << "  -" << endl;
-            var->yaml(os, prefix + "    ");
-        }
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~vdecls() {
         for (auto var : variables) { delete var; }
@@ -106,6 +93,8 @@ struct vdecls : public node {
 struct exp : public node {
     type *exp_type;
 
+    exp(type *t): exp_type(t) {}
+
     // Check whether this expression is a variable (lvalue) or not (rvalue). 
     // Only when exp is a struct varval, this function returns true. 
     virtual bool is_variable() { return false; }
@@ -114,14 +103,7 @@ struct exp : public node {
 struct exps : public node {
     vector<exp *> expressions;
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: exps" << endl;
-        os << prefix << "exps:" << endl;
-        for (auto e : expressions) {
-            os << prefix << "  -" << endl;
-            e->yaml(os, prefix + "    ");
-        }
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~exps() {
         for (auto exp : expressions) { delete exp; }
@@ -131,36 +113,27 @@ struct exps : public node {
 struct lit : public exp {
     int it;
 
-    lit(int i) : it(i) {}
+    lit(int i);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: lit" << endl;
-        os << prefix << "value: " << it << endl;
-    }
+    virtual void yaml(ostream &os, string prefix);
 };
 
 struct flit : public exp {
     float flt;
 
-    flit(float f) : flt(f) {}
+    flit(float f);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: flit" << endl;
-        os << prefix << "value: " << flt << endl;
-    }
+    virtual void yaml(ostream &os, string prefix);
 };
 
 struct varval : public exp {
     id *variable;
 
-    varval(id *v) : variable(v) {}
+    varval(id *v);
 
     bool is_variable() { return true; }
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: varval" << endl;
-        os << prefix << "var: " << variable->identifier << endl;
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~varval() { delete variable; }
 };
@@ -169,14 +142,9 @@ struct assign : public exp {
     id *variable;
     exp *expression;
 
-    assign(id *v, exp *e) : variable(v), expression(e) {}
+    assign(id *v, exp *e);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: assign" << endl;
-        os << prefix << "var: " << variable->identifier << endl;
-        os << prefix << "exp:" << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~assign() { delete variable; delete expression; }
 };
@@ -187,13 +155,7 @@ struct funccall : public exp {
 
     funccall(id *gid, exps *p = 0);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: funccall" << endl;
-        os << prefix << "globid: " << globid->identifier << endl;
-        if (!params) return;
-        os << prefix << "params:" << endl;
-        params->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~funccall() { delete globid; delete params; }
 };
@@ -206,21 +168,16 @@ struct uop : public exp {
 
     exp *expression;
 
-    uop(uop_kind kd, exp *e) : kind(kd), expression(e) {}
+    uop(uop_kind kd, exp *e);
 
-    const char *kind_name() {
+    string kind_name() {
         switch (kind) {
             case uop_not   : return "not"  ;
             case uop_minus : return "minus";
         };
     }
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: uop" << endl;
-        os << prefix << "op: " << kind_name() << endl; 
-        os << prefix << "exp:" << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~uop() { delete expression; }
 };
@@ -240,9 +197,9 @@ struct binop : public exp {
 
     exp *lhs, *rhs; 
 
-    binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right) {}
+    binop(binop_kind kd, exp *left, exp *right);
 
-    const char *kind_name() {
+    string kind_name() {
         switch (kind) {
             case bop_mul : return "mul";
             case bop_div : return "div";
@@ -256,14 +213,7 @@ struct binop : public exp {
         };
     }
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: binop" << endl;
-        os << prefix << "op: " << kind_name() << endl;
-        os << prefix << "lhs:" << endl;
-        lhs->yaml(os, prefix + "  ");
-        os << prefix << "rhs:" << endl;
-        rhs->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~binop() { delete lhs; delete rhs; }
 };
@@ -272,14 +222,9 @@ struct castexp : public exp {
     type *tp;
     exp *expression;
 
-    castexp(type *t, exp *e) : tp(t), expression(e) {}
+    castexp(type *t, exp *e);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: caststmt" << endl;
-        os << prefix << "type: " << tp->name() << endl;
-        os << prefix << "exp:" << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~castexp() { delete tp; delete expression; }
 };
@@ -292,14 +237,7 @@ struct stmt : public node {
 struct stmts : public node {
     vector<stmt *> statements;
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: stmts" << endl;
-        os << prefix << "stmts:" << endl;
-        for (auto s : statements) {
-            os << prefix << "  -" << endl;
-            s->yaml(os, prefix + "    ");
-        }
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~stmts() {
         for (auto stmt : statements) {
@@ -313,12 +251,7 @@ struct blk : public stmt {
 
     blk(stmts *ss = 0) : statements(ss) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: blk" << endl;
-        if (!statements) return;
-        os << prefix << "contents:" << endl;
-        statements->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~blk() { delete statements; }
 };
@@ -329,12 +262,7 @@ struct ret : public stmt {
     ret(exp *e = 0) : expression(e) {}
     bool is_return() { return true; }
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: ret" << endl;
-        if (!expression) return;
-        os << prefix << "exp:" << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~ret() { delete expression; }
 };
@@ -345,13 +273,7 @@ struct vdeclstmt : public stmt {
 
     vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: vardeclstmt" << endl;
-        os << prefix << "vdecl:" << endl;
-        variable->yaml(os, prefix + "  ");
-        os << prefix << "exp: " << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~vdeclstmt() { delete variable; delete expression; }
 };
@@ -361,11 +283,7 @@ struct expstmt : public stmt {
 
     expstmt(exp *e) : expression(e) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: expstmt" << endl;
-        os << prefix << "exp:" << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~expstmt() { delete expression; }
 };
@@ -376,13 +294,7 @@ struct whilestmt : public stmt {
     
     whilestmt(exp *c, stmt *s) : condition(c), statement(s) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: while" << endl;
-        os << prefix << "cond: " << endl;
-        condition->yaml(os, prefix + "  ");
-        os << prefix << "stmt: " << endl;
-        statement->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~whilestmt() { delete condition; delete statement; }
 };
@@ -395,16 +307,7 @@ struct ifstmt : public stmt {
     ifstmt(exp *e, stmt *s, stmt *es = 0) : 
         condition(e), statement(s), else_statement(es) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: if" << endl;
-        os << prefix << "cond:" << endl;
-        condition->yaml(os, prefix + "  ");
-        os << prefix << "stmt:" << endl;
-        statement->yaml(os, prefix + "  ");
-        if (!else_statement) return;
-        os << prefix << "else_stmt:" << endl;
-        else_statement->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~ifstmt() { delete condition; delete statement; delete else_statement; }
 };
@@ -414,11 +317,7 @@ struct print : public stmt {
     
     print(exp *e) : expression(e) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: print" << endl;
-        os << prefix << "exp:" << endl;
-        expression->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~print() { delete expression; }
 };
@@ -428,10 +327,7 @@ struct printslit : public stmt {
 
     printslit(string s) : str(s) {}
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: printslit" << endl;
-        os << prefix << "string: " << str << endl;
-    }
+    virtual void yaml(ostream &os, string prefix);
 };
 
 struct func : public node {
@@ -442,16 +338,7 @@ struct func : public node {
 
     func(type *r, id *g, blk *b, vdecls *v = 0);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: func" << endl;
-        os << prefix << "ret_type: " << rt->name() << endl;
-        os << prefix << "globid: " << globid->identifier << endl;
-        os << prefix << "blk:" << endl;
-        block->yaml(os, prefix + "  ");
-        if (!variable_declarations) return;
-        os << prefix << "vdecls:" << endl;
-        variable_declarations->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~func() { delete rt; delete globid; delete block; delete variable_declarations; }
 };
@@ -459,15 +346,8 @@ struct func : public node {
 struct funcs : public node {
     vector<func *> functions;
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: funcs" << endl;
-        os << prefix << "funcs:" << endl;
-        for (auto fun : functions) {
-            os << prefix << "  -" << endl;
-            fun->yaml(os, prefix + "    ");
-        }
-    }
-
+    virtual void yaml(ostream &os, string prefix);
+    
     ~funcs() {
         for (auto f : functions) { delete f; }
     }
@@ -480,14 +360,7 @@ struct ext : public node {
 
     ext(type *r, id *g, tdecls *t = 0);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: extern" << endl;
-        os << prefix << "ret_type: " << rt->name() << endl;
-        os << prefix << "globid: " << globid->identifier << endl;
-        if (!rt) return;
-        os << prefix << "tdecls:" << endl;
-        type_declarations->yaml(os, prefix + "  ");
-    } 
+    virtual void yaml(ostream &os, string prefix);
 
     ~ext() { delete rt; delete globid; delete type_declarations; }
 };
@@ -495,14 +368,7 @@ struct ext : public node {
 struct exts : public node {
     vector<ext *> externs;
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: externs" << endl;
-        os << prefix << "externs: " << endl;
-        for (auto e : externs) {
-            os << prefix << "  -" << endl;
-            e->yaml(os, prefix + "    ");
-        }
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~exts() {
         for (auto ext : externs) { delete ext; }
@@ -515,14 +381,7 @@ struct prog : public node {
 
     prog(funcs *f, exts *e = 0);
 
-    virtual void yaml(ostream &os, string prefix) {
-        os << prefix << "name: prog" << endl;
-        os << prefix << "funcs:" << endl;
-        functions->yaml(os, prefix + "  ");
-        if (!e) return;
-        os << prefix << "externs: " << endl;
-        e->yaml(os, prefix + "  ");
-    }
+    virtual void yaml(ostream &os, string prefix);
 
     ~prog() { delete functions; delete e; }
 };
