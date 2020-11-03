@@ -60,7 +60,7 @@ void exps::yaml(ostream &os, string prefix) {
         }
 }
 
-lit::lit(int i): it(i), exp(new type(type::t_int)) {}
+lit::lit(int i): exp(new type(type::t_int)), it(i)  {}
 
 void lit::yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
@@ -68,7 +68,7 @@ void lit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << it << endl;
 }
 
-flit::flit(float f): flt(f), exp(new type(type::t_float)) {}
+flit::flit(float f): exp(new type(type::t_float)), flt(f) {}
 
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
@@ -76,7 +76,7 @@ void flit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << flt << endl;
 }
 
-varval::varval(id *v) : variable(v), exp(nullptr) {
+varval::varval(id *v) : exp(nullptr), variable(v) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
 }
@@ -87,7 +87,7 @@ void varval::yaml(ostream &os, string prefix) {
         os << prefix << "var: " << variable->identifier << endl;
 }
 
-assign::assign(id *v, exp *e): variable(v), expression(e), exp(e->exp_type) {
+assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
     if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
     
     type *var_type = vdecl_table[v->identifier]->tp; 
@@ -105,7 +105,7 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(nullptr) {
+funccall::funccall(id *gid, exps *p) : exp(nullptr), globid(gid), params(p) {
     if (function_table.count(globid->identifier)) {
         func *f = function_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
@@ -164,7 +164,7 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
-uop::uop(uop_kind kd, exp *e): kind(kd), expression(e), exp(e->exp_type) {}
+uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {}
 
 void uop::yaml(ostream &os, string prefix) {
         os << prefix << "name: uop" << endl;
@@ -174,7 +174,7 @@ void uop::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {
+binop::binop(binop_kind kd, exp *left, exp *right) : exp(left->exp_type), kind(kd), lhs(left), rhs(right) {
     if (left->exp_type->kind != right->exp_type->kind) {
         error("Types should be the same on both sides of " +
               this->kind_name() + 
@@ -196,7 +196,7 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
-castexp::castexp(type *t, exp *e) : tp(t), expression(e), exp(t) {}
+castexp::castexp(type *t, exp *e) : exp(t), tp(t), expression(e) {}
 
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
