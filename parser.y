@@ -180,8 +180,8 @@ type     : INT                                    {$$ = new type(type::t_int); }
          | FLOAT                                  {$$ = new type(type::t_float); }
          | BOOL                                   {$$ = new type(type::t_bool); }
          | VOID                                   {$$ = new type(type::t_void); }
-         | NOALIAS REF type                       {$$ = $3, $$->ref = true; $$->noalias = true;}              
-         | REF type                               {$$ = $2, $$->ref = true; }
+         | NOALIAS REF type                       {$$ = $3; $$->noalias = true; $$->check_and_make_ref();}              
+         | REF type                               {$$ = $2; $$->check_and_make_ref(); }
          ; 
 
 vdecls   : vdecl                                  {$$ = new vdecls(); $$->variables.push_back($1); }
