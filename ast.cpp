@@ -68,7 +68,7 @@ void lit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << it << endl;
 }
 
-flit::flit(float f): flt(f), exp(new type(type::t_int)) {}
+flit::flit(float f): flt(f), exp(new type(type::t_float)) {}
 
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
@@ -76,7 +76,7 @@ void flit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << flt << endl;
 }
 
-varval::varval(id *v) : variable(v), exp(new type(type::t_int)) {
+varval::varval(id *v) : variable(v), exp(nullptr) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
 }
@@ -105,7 +105,7 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type::t_int)) {
+funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(nullptr) {
     if (function_table.count(globid->identifier)) {
         func *f = function_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
