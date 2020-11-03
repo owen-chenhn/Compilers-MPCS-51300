@@ -232,8 +232,9 @@ void ret::yaml(ostream &os, string prefix) {
 }
 
 vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
-    if (v->tp->ref) {
-        if (!is_same<varval, decltype(*e)>::value) error("Ref variable initilization expression must be a variable.");
+    if (v->tp->ref && !e->is_variable()) {
+        //if (!is_same<varval, decltype(*e)>::value) 
+        error("Ref variable initilization expression must be a variable.");
     }
 }
 
