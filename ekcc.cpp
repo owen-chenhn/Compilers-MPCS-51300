@@ -90,15 +90,15 @@ int main(int argc, char* argv[]) {
     }
     yyin = in_f;
 
+    do {
+        yyparse();
+    } while (!feof(yyin)); 
+
     ofstream os(output, ios::out);
     if (!os) {
         cout << "error: failed to open output file: " << output << endl;
         exit(-1);
     }
-
-    do {
-        yyparse();
-    } while (!feof(yyin)); 
 
     if (emit_ast) {
         os << "---" << endl;

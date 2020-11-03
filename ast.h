@@ -259,7 +259,7 @@ struct blk : public stmt {
 struct ret : public stmt {
     exp *expression;
 
-    ret(exp *e = 0) : expression(e) {}
+    ret(exp *e = 0);
     bool is_return() { return true; }
 
     virtual void yaml(ostream &os, string prefix);
@@ -271,7 +271,7 @@ struct vdeclstmt : public stmt {
     vdecl *variable;
     exp *expression;
 
-    vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {}
+    vdeclstmt(vdecl *v, exp *e);
 
     virtual void yaml(ostream &os, string prefix);
 

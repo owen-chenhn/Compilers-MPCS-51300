@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <iostream>
 #include <type_traits>
 
@@ -10,6 +11,7 @@ using namespace std;
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
+static unordered_set<string> undeclared_functions;
 
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
@@ -60,7 +62,7 @@ void exps::yaml(ostream &os, string prefix) {
         }
 }
 
-lit::lit(int i): it(i), exp(new type(type::t_int)) {}
+lit::lit(int i): exp(new type(type::t_int)), it(i)  {}
 
 void lit::yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
@@ -68,7 +70,7 @@ void lit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << it << endl;
 }
 
-flit::flit(float f): flt(f), exp(new type(type::t_int)) {}
+flit::flit(float f): exp(new type(type::t_float)), flt(f) {}
 
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
@@ -76,7 +78,7 @@ void flit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << flt << endl;
 }
 
-varval::varval(id *v) : variable(v), exp(new type(type::t_int)) {
+varval::varval(id *v) : exp(nullptr), variable(v) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
 }
@@ -87,13 +89,15 @@ void varval::yaml(ostream &os, string prefix) {
         os << prefix << "var: " << variable->identifier << endl;
 }
 
-assign::assign(id *v, exp *e): variable(v), expression(e), exp(e->exp_type) {
+assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
     if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
-    
-    type *var_type = vdecl_table[v->identifier]->tp; 
-
-    if (var_type->ref) {
-        if (!is_same<varval, decltype(*e)>::value) error("Ref variable initilization expression must be a variable.");
+    type *var_type = vdecl_table[v->identifier]->tp;
+    if (var_type->kind != e->exp_type->kind) {
+        error("Types should be the same on both sides of assignment, but got " + 
+              var_type->name() + 
+              " and " + 
+              e->exp_type->name() + 
+              " instead.");
     }
 }
 
@@ -105,7 +109,7 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-funccall::funccall(id *gid, exps *p) : globid(gid), params(p), exp(new type(type::t_int)) {
+funccall::funccall(id *gid, exps *p) : exp(nullptr), globid(gid), params(p) {
     if (function_table.count(globid->identifier)) {
         func *f = function_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
@@ -164,7 +168,14 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
-uop::uop(uop_kind kd, exp *e): kind(kd), expression(e), exp(e->exp_type) {}
+uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {
+    if (kd == uop_not && e->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
+    if (kd == uop_minus) {
+        if (e->exp_type->kind != type::t_int && 
+            e->exp_type->kind != type::t_cint && 
+            e->exp_type->kind != type::t_float) error("Signed negation (-) must be applied to numeric types.");
+    }
+}
 
 void uop::yaml(ostream &os, string prefix) {
         os << prefix << "name: uop" << endl;
@@ -174,7 +185,7 @@ void uop::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(right), exp(left->exp_type) {
+binop::binop(binop_kind kd, exp *left, exp *right) : exp(nullptr), kind(kd), lhs(left), rhs(right) {
     if (left->exp_type->kind != right->exp_type->kind) {
         error("Types should be the same on both sides of " +
               this->kind_name() + 
@@ -183,6 +194,14 @@ binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd), lhs(left), rhs(ri
               " and " + 
               right->exp_type->name() + 
               " instead.");
+    }
+
+    switch (kind) {
+    case bop_add:
+    case bop_sub:
+    case bop_mul:
+    case bop_div: exp_type = left->exp_type; break;
+    default: exp_type = new type(type::t_bool);
     }
 }
 
@@ -196,7 +215,7 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
-castexp::castexp(type *t, exp *e) : tp(t), expression(e), exp(t) {}
+castexp::castexp(type *t, exp *e) : exp(t), tp(t), expression(e) {}
 
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
@@ -222,11 +241,22 @@ void blk::yaml(ostream &os, string prefix) {
         statements->yaml(os, prefix + "  ");
 }
 
+ret::ret(exp *e) : expression(e) {
+    if (e->exp_type->ref) error("Function should not return a reference.");
+}
+
 void ret::yaml(ostream &os, string prefix) {
         os << prefix << "name: ret" << endl;
         if (!expression) return;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
+}
+
+vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
+    if (v->tp->ref && !e->is_variable()) {
+        //if (!is_same<varval, decltype(*e)>::value) 
+        error("Ref variable initilization expression must be a variable.");
+    }
 }
 
 void vdeclstmt::yaml(ostream &os, string prefix) {
@@ -279,7 +309,7 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     if (extern_table.count(globid->identifier) || 
         function_table.count(globid->identifier))
         error("Duplicate declaration of function '" + globid->identifier + "'.");
-    if (rt->ref) error("Function return type is a reference.");
+    if (rt->ref) error("Function should not return a reference.");
     if (globid->identifier == "run") {
         // Funtion "run" must return int/cint and take no arguments.
         if (rt->kind != type::t_int && rt->kind != type::t_cint) 
@@ -302,6 +332,7 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
         }
     }
     function_table[globid->identifier] = this;
+    vdecl_table.clear();
 }
 
 void func::yaml(ostream &os, string prefix) {
@@ -327,7 +358,7 @@ void funcs::yaml(ostream &os, string prefix) {
 ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     if (globid->identifier == "run") error("Function 'run' cannot be external.");
     if (extern_table.count(globid->identifier)) error("Duplicate declaration of function '" + globid->identifier + "'.");
-    if (rt->ref) error("Function return type is a reference.");
+    if (rt->ref) error("Function should not return a reference.");
     extern_table[globid->identifier] = this;
 }
 
