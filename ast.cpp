@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <iostream>
 #include <type_traits>
 
@@ -10,6 +11,7 @@ using namespace std;
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
+static unordered_set<string> undeclared_functions;
 
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
