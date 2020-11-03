@@ -224,6 +224,10 @@ void blk::yaml(ostream &os, string prefix) {
         statements->yaml(os, prefix + "  ");
 }
 
+ret::ret(exp *e = 0) : expression(e) {
+    if (e->exp_type->ref) error("Function should not return a reference.");
+}
+
 void ret::yaml(ostream &os, string prefix) {
         os << prefix << "name: ret" << endl;
         if (!expression) return;
@@ -288,7 +292,7 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     if (extern_table.count(globid->identifier) || 
         function_table.count(globid->identifier))
         error("Duplicate declaration of function '" + globid->identifier + "'.");
-    if (rt->ref) error("Function return type is a reference.");
+    if (rt->ref) error("Function should not return a reference.");
     if (globid->identifier == "run") {
         // Funtion "run" must return int/cint and take no arguments.
         if (rt->kind != type::t_int && rt->kind != type::t_cint) 
@@ -337,7 +341,7 @@ void funcs::yaml(ostream &os, string prefix) {
 ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     if (globid->identifier == "run") error("Function 'run' cannot be external.");
     if (extern_table.count(globid->identifier)) error("Duplicate declaration of function '" + globid->identifier + "'.");
-    if (rt->ref) error("Function return type is a reference.");
+    if (rt->ref) error("Function should not return a reference.");
     extern_table[globid->identifier] = this;
 }
 
