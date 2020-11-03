@@ -271,7 +271,7 @@ struct vdeclstmt : public stmt {
     vdecl *variable;
     exp *expression;
 
-    vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {}
+    vdeclstmt(vdecl *v, exp *e);
 
     virtual void yaml(ostream &os, string prefix);
 

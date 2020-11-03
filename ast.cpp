@@ -89,11 +89,13 @@ void varval::yaml(ostream &os, string prefix) {
 
 assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
     if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
-    
-    type *var_type = vdecl_table[v->identifier]->tp; 
-
-    if (var_type->ref) {
-        if (!is_same<varval, decltype(*e)>::value) error("Ref variable initilization expression must be a variable.");
+    type *var_type = vdecl_table[v->identifier]->tp;
+    if (var_type->kind != e->exp_type->kind) {
+        error("Types should be the same on both sides of assignment, but got " + 
+              var_type->name() + 
+              " and " + 
+              e->exp_type->name() + 
+              " instead.");
     }
 }
 
@@ -229,6 +231,12 @@ void ret::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
+vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
+    if (v->tp->ref) {
+        if (!is_same<varval, decltype(*e)>::value) error("Ref variable initilization expression must be a variable.");
+    }
+}
+
 void vdeclstmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: vardeclstmt" << endl;
         os << prefix << "vdecl:" << endl;
@@ -302,6 +310,7 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
         }
     }
     function_table[globid->identifier] = this;
+    vdecl_table.clear();
 }
 
 void func::yaml(ostream &os, string prefix) {
