@@ -12,12 +12,7 @@ For assignment 1, please
 2. run 'make'
 3. run ./bin/ekcc -emit-ast -o <output_file> <input_file>
 
-For assignment 2, 
-Deficits:
-1. We have implemented the check for function call before declaration. But at this point this implementation would result in recursive functions not being able to process successfully. E.g., the function "fib" calls itself in its function body, and our compiler will report error about this, which is a minor bug of our implementation, because we tried to do all the error checking in parsing stage (i.e., during construction of each symbol structure). However, for truely error cases (like calling a truely undefined function), our compiler can correctly detect them.  
 
-Bonus:
-1. We implemented duplicate variable declaration check.
-2. Checked variable usage before declaration.
-3. Checked whether passed in function parameters match function signature. 
-4. Checked whether the return type of a function indeed matches the type of all the return statements in its function body.  
+For fuzz testing, intentional easy-to-find bugs include:  
+1. Crash when handling recursive function.  
+2. 
