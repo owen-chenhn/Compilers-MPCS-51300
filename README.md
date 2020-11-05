@@ -13,8 +13,5 @@ For assignment 1, please
 3. run ./bin/ekcc -emit-ast -o <output_file> <input_file>
 
 
-For fuzz testing, intentional easy-to-find bugs include:  
-1. Not able to handle recursive functions.  
-2. Never initialize pointers of *all* the structs in their constructors.  
-3. Never add function names to the function table when functions are defined.  
-4. Never clear the variable table.   
+For fuzz testing, one easy-to-find bug:  
+1. Not able to handle recursive functions. The compiler will erroneously complain when input program contains recursive function (like function "fib" in test/test1.ek).  

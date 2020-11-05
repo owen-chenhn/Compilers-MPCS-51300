@@ -24,9 +24,7 @@ void type::error(const string& err_msg) {
     exit(1);
 }
 
-//vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
-// Easy-to-find bugs
-vdecl::vdecl(type *t, id *var): tp(), variable() {
+vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
     if (vdecl_table.count(var->identifier)) error("Duplicate variable declaration: " + var->identifier + ".");  
     if (t->kind == type::t_void) error("Variable type may not be void.");
     vdecl_table[var->identifier] = this;
@@ -64,8 +62,7 @@ void exps::yaml(ostream &os, string prefix) {
         }
 }
 
-//lit::lit(int i): exp(new type(type::t_int)), it(i)  {}
-lit::lit(int i): it(i)  {}
+lit::lit(int i): exp(new type(type::t_int)), it(i)  {}
 
 void lit::yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
@@ -73,8 +70,7 @@ void lit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << it << endl;
 }
 
-//flit::flit(float f): exp(new type(type::t_float)), flt(f) {}
-flit::flit(float f): flt(f) {}
+flit::flit(float f): exp(new type(type::t_float)), flt(f) {}
 
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
@@ -82,9 +78,7 @@ void flit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << flt << endl;
 }
 
-//varval::varval(id *v) : exp(nullptr), variable(v) {
-// Easy-to-find bugs
-varval::varval(id *v) {
+varval::varval(id *v) : exp(nullptr), variable(v) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
 }
@@ -95,8 +89,7 @@ void varval::yaml(ostream &os, string prefix) {
         os << prefix << "var: " << variable->identifier << endl;
 }
 
-//assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
-assign::assign(id *v, exp *e) {
+assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
     if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
     type *var_type = vdecl_table[v->identifier]->tp;
     if (var_type->kind != e->exp_type->kind) {
@@ -116,8 +109,7 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-//funccall::funccall(id *gid, exps *p) : exp(nullptr), globid(gid), params(p) {
-funccall::funccall(id *gid, exps *p) {
+funccall::funccall(id *gid, exps *p) : exp(nullptr), globid(gid), params(p) {
     if (function_table.count(globid->identifier)) {
         func *f = function_table[globid->identifier];
         unsigned num_params = params->expressions.size(), 
@@ -176,8 +168,7 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
-//uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {
-uop::uop(uop_kind kd, exp *e): kind(kd) {
+uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {
     if (kd == uop_not && e->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
     if (kd == uop_minus) {
         if (e->exp_type->kind != type::t_int && 
@@ -194,8 +185,7 @@ void uop::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-//binop::binop(binop_kind kd, exp *left, exp *right) : exp(nullptr), kind(kd), lhs(left), rhs(right) {
-binop::binop(binop_kind kd, exp *left, exp *right) : kind(kd) {
+binop::binop(binop_kind kd, exp *left, exp *right) : exp(nullptr), kind(kd), lhs(left), rhs(right) {
     if (left->exp_type->kind != right->exp_type->kind) {
         error("Types should be the same on both sides of " +
               this->kind_name() + 
@@ -225,8 +215,7 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
-//castexp::castexp(type *t, exp *e) : exp(t), tp(t), expression(e) {}
-castexp::castexp(type *t, exp *e) {}
+castexp::castexp(type *t, exp *e) : exp(t), tp(t), expression(e) {}
 
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
@@ -252,8 +241,7 @@ void blk::yaml(ostream &os, string prefix) {
         statements->yaml(os, prefix + "  ");
 }
 
-//ret::ret(exp *e) : expression(e) {
-ret::ret(exp *e) {
+ret::ret(exp *e) : expression(e) {
     if (e->exp_type->ref) error("Function should not return a reference.");
 }
 
@@ -264,8 +252,7 @@ void ret::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-//vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
-vdeclstmt::vdeclstmt(vdecl *v, exp *e) {
+vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
     if (v->tp->ref && !e->is_variable()) {
         //if (!is_same<varval, decltype(*e)>::value) 
         error("Ref variable initilization expression must be a variable.");
@@ -344,9 +331,8 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             }
         }
     }
-    // Easy-to-find bugs
-    //function_table[globid->identifier] = this;
-    //vdecl_table.clear();
+    function_table[globid->identifier] = this;
+    vdecl_table.clear();
 }
 
 void func::yaml(ostream &os, string prefix) {
@@ -373,8 +359,7 @@ ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     if (globid->identifier == "run") error("Function 'run' cannot be external.");
     if (extern_table.count(globid->identifier)) error("Duplicate declaration of function '" + globid->identifier + "'.");
     if (rt->ref) error("Function should not return a reference.");
-    // Easy-to-find bugs
-    //extern_table[globid->identifier] = this;
+    extern_table[globid->identifier] = this;
 }
 
 void ext::yaml(ostream &os, string prefix) {

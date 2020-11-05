@@ -92,8 +92,7 @@ struct vdecls : public node {
 
 struct exp : public node {
     type *exp_type;   
-    // Easy-to-find bugs
-    //exp(type *t): exp_type(t) {}
+    exp(type *t): exp_type(t) {}
 
     // Check whether this expression is a variable (lvalue) or not (rvalue). 
     // Only when exp is a struct varval, this function returns true. 
