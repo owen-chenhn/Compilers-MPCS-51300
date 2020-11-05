@@ -147,7 +147,7 @@ exp      : '(' exp ')'                            {$$ = $2; }
          | '[' type ']' exp                       {$$ = new castexp($2, $4); }
          ; 
 
-assign   : varid '=' exp                            {$$ = new assign($1, $3); }  
+assign   : varid '=' exp                          {$$ = new assign(new varval($1), $3); }  
          ;
 
 /* here binop did not follow strictly to the language specifications 

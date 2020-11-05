@@ -62,15 +62,11 @@ void exps::yaml(ostream &os, string prefix) {
         }
 }
 
-lit::lit(int i): exp(new type(type::t_int)), it(i)  {}
-
 void lit::yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "value: " << it << endl;
 }
-
-flit::flit(float f): exp(new type(type::t_float)), flt(f) {}
 
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
@@ -89,14 +85,13 @@ void varval::yaml(ostream &os, string prefix) {
         os << prefix << "var: " << variable->identifier << endl;
 }
 
-assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
-    if (!vdecl_table.count(v->identifier)) error("Initilization of undeclared variable " + v->identifier + ".");
-    type *var_type = vdecl_table[v->identifier]->tp;
-    if (var_type->kind != e->exp_type->kind) {
+void assign::check_type() {
+    expression->check_type();
+    if (variable->exp_type->kind != expression->exp_type->kind) {
         error("Types should be the same on both sides of assignment, but got " + 
-              var_type->name() + 
+              variable->exp_type->name() + 
               " and " + 
-              e->exp_type->name() + 
+              expression->exp_type->name() + 
               " instead.");
     }
 }
@@ -104,59 +99,55 @@ assign::assign(id *v, exp *e): exp(e->exp_type), variable(v), expression(e) {
 void assign::yaml(ostream &os, string prefix) {
         os << prefix << "name: assign" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
-        os << prefix << "var: " << variable->identifier << endl;
+        os << prefix << "var: " << variable->variable->identifier << endl;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
 }
 
-funccall::funccall(id *gid, exps *p) : exp(nullptr), globid(gid), params(p) {
-    if (function_table.count(globid->identifier)) {
-        func *f = function_table[globid->identifier];
-        unsigned num_params = params->expressions.size(), 
-                    num_decls = f->variable_declarations->variables.size();
-        if (num_params != num_decls) 
-            error("Arguments mismatch when calling function '" + globid->identifier + 
-                    "'. Expecting " + to_string(num_decls) + 
-                    " but get " + to_string(num_params) + ".");
-        for (unsigned i = 0; i < num_decls; i++) {
-            exp *expr = params->expressions[i];
-            vdecl *var_declared = f->variable_declarations->variables[i];
-            type *exp_tp = expr->exp_type, *decl_tp = var_declared->tp;
-            if (exp_tp->kind != decl_tp->kind) 
-                error("Function '" + globid->identifier + 
-                        "' got wrong argument type. Argument " + to_string(i+1) + " should be " 
-                        + decl_tp->name() + " but got " + exp_tp->name());
-            if (decl_tp->ref && !expr->is_variable()) 
-                error("Function '" + globid->identifier + 
-                        "' expects variable (lvalue) for its reference argument " 
-                        + to_string(i+1) + ".");
-        }
-        exp_type = f->rt;
+void funccall::check_type() {
+    if (params) {
+        for (exp *expr : params->expressions) expr->check_type(); 
     }
-    else if (extern_table.count(globid->identifier)) {
-        ext *e = extern_table[globid->identifier];
-        unsigned num_params = params->expressions.size(), 
-                    num_decls = e->type_declarations->types.size();
-        if (num_params != num_decls) 
-            error("Arguments mismatch when calling function '" + globid->identifier + 
-                    "'. Expecting " + to_string(num_decls) + 
-                    " but get " + to_string(num_params) + ".");
-        for (unsigned i = 0; i < num_decls; i++) {
-            exp *expr = params->expressions[i];
-            type *tp_declared = e->type_declarations->types[i];
-            type *exp_tp = expr->exp_type, *decl_tp = tp_declared;
-            if (exp_tp->kind != decl_tp->kind) 
-                error("Function '" + globid->identifier + 
-                        "' got wrong argument type. Argument " + to_string(i+1) + " should be " 
-                        + tp_declared->name() + " but get " + exp_tp->name());
-            if (tp_declared->ref && !expr->is_variable()) 
-                error("Function '" + globid->identifier + 
-                        "' expects variable (lvalue) for its reference argument " 
-                        + to_string(i+1) + ".");
-        }
-        exp_type = e->rt;
-    }
+    
+    bool flag;
+    if (function_table.count(globid->identifier)) flag = true;
+    else if (extern_table.count(globid->identifier)) flag = false;
     else error("Undeclared function '" + globid->identifier + "' is called.");
+
+    func *f = nullptr;
+    ext *e = nullptr;
+    if (flag) f = function_table[globid->identifier];
+    else e = extern_table[globid->identifier];
+
+    unsigned num_params = params ? params->expressions.size() : 0;
+    unsigned num_decls;
+    if (flag && f->variable_declarations) num_decls = f->variable_declarations->variables.size();
+    else if (!flag && e->type_declarations) num_decls = e->type_declarations->types.size();
+    else num_decls = 0;
+
+    if (num_params != num_decls) {
+        error("Arguments mismatch when calling function '" + globid->identifier + 
+                "'. Expect " + to_string(num_decls) + " arguments but got " + 
+                to_string(num_params) + ".");
+    }
+    for (unsigned i = 0; i < num_decls; i++) {
+        exp *expr = params->expressions[i];
+        type *exp_tp  = expr->exp_type, 
+             *decl_tp = flag ? f->variable_declarations->variables[i]->tp 
+                             : e->type_declarations->types[i];
+        if (exp_tp->kind != decl_tp->kind) {
+            error("Function '" + globid->identifier + 
+                  "' got wrong argument type. Argument " + to_string(i+1) + 
+                  " should be " + decl_tp->name() + " but got " + exp_tp->name());
+        }
+        if (decl_tp->ref && !expr->is_variable()) {
+            error("Function '" + globid->identifier + 
+                  "' expects variable (lvalue) for its reference argument " + 
+                  to_string(i+1) + ".");
+        }
+    }
+
+    exp_type = flag ? f->rt : e->rt;
 }
 
 void funccall::yaml(ostream &os, string prefix) {
@@ -168,13 +159,15 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
-uop::uop(uop_kind kd, exp *e): exp(e->exp_type), kind(kd), expression(e) {
-    if (kd == uop_not && e->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
-    if (kd == uop_minus) {
-        if (e->exp_type->kind != type::t_int && 
-            e->exp_type->kind != type::t_cint && 
-            e->exp_type->kind != type::t_float) error("Signed negation (-) must be applied to numeric types.");
+void uop::check_type() {
+    expression->check_type();
+    if (kind == uop_not && expression->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
+    if (kind == uop_minus) {
+        if (expression->exp_type->kind != type::t_int && 
+            expression->exp_type->kind != type::t_cint && 
+            expression->exp_type->kind != type::t_float) error("Signed negation (-) must be applied to numeric types.");
     }
+    exp_type = expression->exp_type;
 }
 
 void uop::yaml(ostream &os, string prefix) {
@@ -185,14 +178,16 @@ void uop::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-binop::binop(binop_kind kd, exp *left, exp *right) : exp(nullptr), kind(kd), lhs(left), rhs(right) {
-    if (left->exp_type->kind != right->exp_type->kind) {
+void binop::check_type() {
+    lhs->check_type();
+    rhs->check_type();
+    if (lhs->exp_type->kind != rhs->exp_type->kind) {
         error("Types should be the same on both sides of " +
               this->kind_name() + 
               " but got " + 
-              left->exp_type->name() + 
+              lhs->exp_type->name() + 
               " and " + 
-              right->exp_type->name() + 
+              rhs->exp_type->name() + 
               " instead.");
     }
 
@@ -200,7 +195,7 @@ binop::binop(binop_kind kd, exp *left, exp *right) : exp(nullptr), kind(kd), lhs
     case bop_add:
     case bop_sub:
     case bop_mul:
-    case bop_div: exp_type = left->exp_type; break;
+    case bop_div: exp_type = lhs->exp_type; break;
     default: exp_type = new type(type::t_bool);
     }
 }
@@ -242,7 +237,7 @@ void blk::yaml(ostream &os, string prefix) {
 }
 
 ret::ret(exp *e) : expression(e) {
-    if (e->exp_type->ref) error("Function should not return a reference.");
+    if (e && e->exp_type->ref) error("Function should not return a reference.");
 }
 
 void ret::yaml(ostream &os, string prefix) {
@@ -256,6 +251,14 @@ vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
     if (v->tp->ref && !e->is_variable()) {
         //if (!is_same<varval, decltype(*e)>::value) 
         error("Ref variable initilization expression must be a variable.");
+    }
+}
+
+void vdeclstmt::check_exp() {
+    expression->check_type();
+    if (variable->tp->kind != expression->exp_type->kind) {
+        error("Variable " + variable->getName() + " is initialized with wrong type. Expect " + 
+              variable->tp->name() + " but got " + expression->exp_type->name());
     }
 }
 
@@ -316,12 +319,16 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             error("Funtion 'run' must have return type int or cint.");
         if (v != NULL) error("Funtion 'run' cannot have arguments.");
     }
-    // Check return type
+
+    function_table[globid->identifier] = this;
+
+    // Check function block and return type
     if (block->statements == NULL && rt->kind != type::t_void) 
-        error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-        "Empty body but non-void return type.");
+        error("Funtion '" + globid->identifier + "' has empty body but non-void return type.");
     else {
         for (stmt *st : block->statements->statements) {
+            st->check_exp();
+
             if (st->is_return()) {
                 type *ret_type = ((ret *) st)->expression->exp_type;
                 if (ret_type->kind != rt->kind) 
@@ -331,7 +338,6 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             }
         }
     }
-    function_table[globid->identifier] = this;
     vdecl_table.clear();
 }
 

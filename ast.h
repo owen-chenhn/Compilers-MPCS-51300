@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <iostream>
+#include <cassert>
 
 using namespace std;
 
@@ -18,7 +19,7 @@ struct node {
 
 struct type {
     enum type_kind {
-        t_void = 0,
+        t_void,
         t_bool,
         t_int,
         t_cint,
@@ -62,6 +63,7 @@ struct vdecl : public node {
     id *variable;
 
     vdecl(type *t, id *var);
+    string getName() { return variable->identifier; }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -89,7 +91,6 @@ struct vdecls : public node {
 };
 
 
-
 struct exp : public node {
     type *exp_type;
 
@@ -98,6 +99,9 @@ struct exp : public node {
     // Check whether this expression is a variable (lvalue) or not (rvalue). 
     // Only when exp is a struct varval, this function returns true. 
     virtual bool is_variable() { return false; }
+
+    // Check and determine the type of this expression. 
+    virtual void check_type() { assert (exp_type != nullptr); }
 };
 
 struct exps : public node {
@@ -113,7 +117,7 @@ struct exps : public node {
 struct lit : public exp {
     int it;
 
-    lit(int i);
+    lit(int i): exp(new type(type::t_int)), it(i)  {}
 
     virtual void yaml(ostream &os, string prefix);
 };
@@ -121,7 +125,7 @@ struct lit : public exp {
 struct flit : public exp {
     float flt;
 
-    flit(float f);
+    flit(float f): exp(new type(type::t_float)), flt(f) {}
 
     virtual void yaml(ostream &os, string prefix);
 };
@@ -139,10 +143,11 @@ struct varval : public exp {
 };
 
 struct assign : public exp {
-    id *variable;
+    varval *variable;
     exp *expression;
 
-    assign(id *v, exp *e);
+    assign(varval *v, exp *e): exp(v->exp_type), variable(v), expression(e) {}
+    void check_type();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -153,7 +158,8 @@ struct funccall : public exp {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0);
+    funccall(id *gid, exps *p = 0): exp(nullptr), globid(gid), params(p) {}
+    void check_type();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -168,7 +174,8 @@ struct uop : public exp {
 
     exp *expression;
 
-    uop(uop_kind kd, exp *e);
+    uop(uop_kind kd, exp *e): exp(nullptr), kind(kd), expression(e) {}
+    void check_type();
 
     string kind_name() {
         switch (kind) {
@@ -197,7 +204,8 @@ struct binop : public exp {
 
     exp *lhs, *rhs; 
 
-    binop(binop_kind kd, exp *left, exp *right);
+    binop(binop_kind kd, exp *left, exp *right): exp(nullptr), kind(kd), lhs(left), rhs(right) {}
+    void check_type();
 
     string kind_name() {
         switch (kind) {
@@ -232,6 +240,8 @@ struct castexp : public exp {
 struct stmt : public node {
     // Check whether this statement is a return statement.
     virtual bool is_return() { return false; }
+    // Check types of the statement's all expressions.
+    virtual void check_exp() {}
 }; 
 
 struct stmts : public node {
@@ -250,6 +260,11 @@ struct blk : public stmt {
     stmts *statements;
 
     blk(stmts *ss = 0) : statements(ss) {}
+    void check_exp() {
+        if (statements) {
+            for (stmt *st : statements->statements) st->check_exp();
+        }
+    }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -261,6 +276,7 @@ struct ret : public stmt {
 
     ret(exp *e = 0);
     bool is_return() { return true; }
+    void check_exp() { if (expression) expression->check_type(); }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -272,6 +288,7 @@ struct vdeclstmt : public stmt {
     exp *expression;
 
     vdeclstmt(vdecl *v, exp *e);
+    void check_exp();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -282,6 +299,7 @@ struct expstmt : public stmt {
     exp *expression;
 
     expstmt(exp *e) : expression(e) {}
+    void check_exp() { expression->check_type(); }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -293,6 +311,7 @@ struct whilestmt : public stmt {
     stmt *statement;
     
     whilestmt(exp *c, stmt *s) : condition(c), statement(s) {}
+    void check_exp() { condition->check_type(); statement->check_exp(); }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -307,6 +326,12 @@ struct ifstmt : public stmt {
     ifstmt(exp *e, stmt *s, stmt *es = 0) : 
         condition(e), statement(s), else_statement(es) {}
 
+    void check_exp() { 
+        condition->check_type(); 
+        statement->check_exp(); 
+        if (else_statement) else_statement->check_exp(); 
+    }
+
     virtual void yaml(ostream &os, string prefix);
 
     ~ifstmt() { delete condition; delete statement; delete else_statement; }
@@ -316,6 +341,7 @@ struct print : public stmt {
     exp *expression;
     
     print(exp *e) : expression(e) {}
+    void check_exp() { expression->check_type(); }
 
     virtual void yaml(ostream &os, string prefix);
 
