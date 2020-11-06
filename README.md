@@ -14,5 +14,5 @@ e.g. export CXX=<somepath>/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/cl
 
 2. One bug that is easy to find is that the program is not able to handle recursive functions. The compiler will erroneously complain when input program contains recursive function (like function "fib" in test1.ek).  
 
-3. After you run 'make', and then './bin/ekcc test1.ek' you will find the expected fuzz test result of reporting "error: Function should not return a reference." 
+3. After you run 'make', and then './bin/ekcc test1.ek' you will find the expected fuzz test result of reporting “error: Undeclared function 'fib' is called.”
 
