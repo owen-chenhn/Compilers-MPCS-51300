@@ -4,7 +4,7 @@ all: ekcc
 
 ekcc: parser lexer ast main
 	rm -f bin/ekcc
-	$(CXX) $(CXXFLAG) -o bin/ekcc bin/*
+	$(CXX) $(CXXFLAG) -fsanitize=fuzzer,memory -o bin/ekcc bin/*
 
 parser: parser.y ast.h
 	bison -d parser.y		# bison -L c++ -o parser.cpp -d parser.y
@@ -18,8 +18,8 @@ ast: ast.cpp ast.h
 	$(CXX) $(CXXFLAG) -c -o bin/ast.o ast.cpp
 
 main: ekcc.cpp ekcc.h ast.h parser
-	$(CXX) $(CXXFLAG) -c -o bin/main.o ekcc.cpp
+	$(CXX) $(CXXFLAG) -fsanitize=fuzzer,memory -c -o bin/main.o ekcc.cpp 
 
 
 clean: 
-	rm -rf bin/* lexer.c parser.tab.* *.yaml *.dSYM
+	rm -rf bin/* lexer.c parser.tab.* *.yaml *.dSYM crash-*
