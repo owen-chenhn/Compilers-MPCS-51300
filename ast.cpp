@@ -210,8 +210,6 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
-castexp::castexp(type *t, exp *e) : exp(t), tp(t), expression(e) {}
-
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
@@ -234,10 +232,6 @@ void blk::yaml(ostream &os, string prefix) {
         if (!statements) return;
         os << prefix << "contents:" << endl;
         statements->yaml(os, prefix + "  ");
-}
-
-ret::ret(exp *e) : expression(e) {
-    if (e && e->exp_type->ref) error("Function should not return a reference.");
 }
 
 void ret::yaml(ostream &os, string prefix) {
@@ -319,22 +313,27 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             error("Funtion 'run' must have return type int or cint.");
         if (v != NULL) error("Funtion 'run' cannot have arguments.");
     }
+    if (block->statements == NULL && rt->kind != type::t_void) 
+        error("Funtion '" + globid->identifier + "' has empty body but non-void return type.");
 
     function_table[globid->identifier] = this;
 
     // Check function block and return type
-    if (block->statements == NULL && rt->kind != type::t_void) 
-        error("Funtion '" + globid->identifier + "' has empty body but non-void return type.");
-    else {
+    if (block->statements) {
         for (stmt *st : block->statements->statements) {
             st->check_exp();
-
             if (st->is_return()) {
-                type *ret_type = ((ret *) st)->expression->exp_type;
-                if (ret_type->kind != rt->kind) 
+                ret *ret_stmt = (ret *) st;
+                if (!ret_stmt->expression && rt->kind != type::t_bool) {
                     error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-                    "Expect " + rt->name() + " but get " + 
-                    ret_type->name() + ".");
+                    "Expect " + rt->name() + " but returns nothing.");
+                }
+                if (ret_stmt->expression && 
+                    ret_stmt->expression->exp_type->kind != rt->kind) {
+                    error("Funtion '" + globid->identifier + "' has wrong return type. " + 
+                    "Expect " + rt->name() + " but got " + 
+                    ret_stmt->expression->exp_type->name() + ".");
+                }
             }
         }
     }
