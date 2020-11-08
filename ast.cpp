@@ -11,7 +11,6 @@ using namespace std;
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
-static unordered_set<string> undeclared_functions;
 
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
@@ -324,7 +323,7 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             st->check_exp();
             if (st->is_return()) {
                 ret *ret_stmt = (ret *) st;
-                if (!ret_stmt->expression && rt->kind != type::t_bool) {
+                if (!ret_stmt->expression && rt->kind != type::t_void) {
                     error("Funtion '" + globid->identifier + "' has wrong return type. " + 
                     "Expect " + rt->name() + " but returns nothing.");
                 }
