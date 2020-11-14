@@ -2,15 +2,30 @@
 
 #include <vector>
 #include <unordered_map>
-#include <unordered_set>
 #include <iostream>
 #include <type_traits>
+
+#include "llvm/IR/Type.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/Verifier.h"
 
 using namespace std;
 
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
+
+// Classes for llvm code generation
+static LLVMContext context;
+static IRBuilder<> builder(context);
+static std::unique_ptr<Module> module;
 
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");

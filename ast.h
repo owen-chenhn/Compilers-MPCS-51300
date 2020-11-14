@@ -6,6 +6,8 @@
 #include <iostream>
 #include <cassert>
 
+#include "llvm/IR/Value.h"
+
 using namespace std;
 
 struct node {
@@ -102,6 +104,9 @@ struct exp : public node {
 
     // Check and determine the type of this expression. 
     virtual void check_type() { assert (exp_type != nullptr); }
+
+    // Generate llvm-IR code
+    virtual Value *code_gen() = 0;
 };
 
 struct exps : public node {
