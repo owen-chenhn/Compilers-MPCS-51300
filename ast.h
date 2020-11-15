@@ -251,7 +251,7 @@ struct castexp : public exp {
     exp *expression;
 
     castexp(type *t, exp *e): exp(t), tp(t), expression(e) {}
-    void check_type() { expression->check_type(); }
+    void check_type();
 
     virtual void yaml(ostream &os, string prefix);
 
