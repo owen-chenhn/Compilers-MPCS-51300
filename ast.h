@@ -292,7 +292,15 @@ struct blk : public stmt {
         }
     }
 
-    Value *code_gen();
+    Value *code_gen() {
+        Value *ret;
+        if (statements) {
+            for (stmt *st : statements->statements) {
+                ret = st->code_gen();
+            }
+        }
+        return ret;
+    }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -305,6 +313,7 @@ struct ret : public stmt {
     ret(exp *e = 0): expression(e) {}
     bool is_return() { return true; }
     void check_exp() { if (expression) expression->check_type(); }
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -317,6 +326,7 @@ struct vdeclstmt : public stmt {
 
     vdeclstmt(vdecl *v, exp *e);
     void check_exp();
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -328,6 +338,7 @@ struct expstmt : public stmt {
 
     expstmt(exp *e) : expression(e) {}
     void check_exp() { expression->check_type(); }
+    Value *code_gen() { return expression->code_gen(); }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -340,6 +351,7 @@ struct whilestmt : public stmt {
     
     whilestmt(exp *c, stmt *s) : condition(c), statement(s) {}
     void check_exp() { condition->check_type(); statement->check_exp(); }
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -359,6 +371,7 @@ struct ifstmt : public stmt {
         statement->check_exp(); 
         if (else_statement) else_statement->check_exp(); 
     }
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -370,6 +383,7 @@ struct print : public stmt {
     
     print(exp *e) : expression(e) {}
     void check_exp() { expression->check_type(); }
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -380,6 +394,7 @@ struct printslit : public stmt {
     string str;
 
     printslit(string s) : str(s) {}
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 };
@@ -433,14 +448,14 @@ struct exts : public node {
 
 struct prog : public node {
     funcs *functions;
-    exts *e;
+    exts *externs;
 
     prog(funcs *f, exts *e = 0);
     Module *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
-    ~prog() { delete functions; delete e; }
+    ~prog() { delete functions; delete externs; }
 };
 
 #endif /* _AST_H_ */

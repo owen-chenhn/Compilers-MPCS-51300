@@ -14,6 +14,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"
 
 using namespace std;
@@ -360,6 +361,16 @@ void blk::yaml(ostream &os, string prefix) {
         statements->yaml(os, prefix + "  ");
 }
 
+Value *ret::code_gen() {
+    if (expression) {
+        Value *exp_v = expression->code_gen();
+        if (!exp_v) return nullptr;
+        return builder->CreateRet(exp_v);
+    }
+    else
+        return builder->CreateRetVoid();
+}
+
 void ret::yaml(ostream &os, string prefix) {
         os << prefix << "name: ret" << endl;
         if (!expression) return;
@@ -382,6 +393,14 @@ void vdeclstmt::check_exp() {
     }
 }
 
+Value *vdeclstmt::code_gen() {
+    Value *exp_v = expression->code_gen();
+    if (!exp_v) return nullptr;
+
+    name_to_Value[variable->getName()] = exp_v;
+    return exp_v;
+}
+
 void vdeclstmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: vardeclstmt" << endl;
         os << prefix << "vdecl:" << endl;
@@ -396,12 +415,64 @@ void expstmt::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
+Value *whilestmt::code_gen() {
+    Function *the_func = builder->GetInsertBlock()->getParent();
+    BasicBlock *head_bb = BasicBlock::Create(*context, "loop_head", the_func), 
+               *body_bb = BasicBlock::Create(*context, "loop_body"), 
+               *exit_bb = BasicBlock::Create(*context, "loop_exit");
+    
+    builder->SetInsertPoint(head_bb);
+    Value *cond_v = condition->code_gen();
+    if (!cond_v) return nullptr;
+    builder->CreateCondBr(cond_v, body_bb, exit_bb);
+
+    // loop body
+    the_func->getBasicBlockList().push_back(body_bb);
+    builder->SetInsertPoint(body_bb);
+    statement->code_gen();
+    builder->CreateBr(head_bb);
+
+    // loop exit
+    the_func->getBasicBlockList().push_back(exit_bb);
+    builder->SetInsertPoint(exit_bb);
+    return nullptr;
+}
+
 void whilestmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: while" << endl;
         os << prefix << "cond: " << endl;
         condition->yaml(os, prefix + "  ");
         os << prefix << "stmt: " << endl;
         statement->yaml(os, prefix + "  ");
+}
+
+Value *ifstmt::code_gen() {
+    Value *cond_v = condition->code_gen();
+    if (!cond_v) return nullptr;
+
+    Function *the_func = builder->GetInsertBlock()->getParent();
+    BasicBlock *then_bb = BasicBlock::Create(*context, "then", the_func), 
+               *else_bb = BasicBlock::Create(*context, "else"), 
+               *merge_bb = BasicBlock::Create(*context, "ifcont");
+    builder->CreateCondBr(cond_v, then_bb, else_bb);
+
+    // insert then's code
+    builder->SetInsertPoint(then_bb);
+    Value *then_v = statement->code_gen();
+    builder->CreateBr(merge_bb);
+    then_bb = builder->GetInsertBlock();
+
+    // insert else's code
+    the_func->getBasicBlockList().push_back(else_bb);
+    builder->SetInsertPoint(else_bb);
+    if (else_statement) else_statement->code_gen();
+    builder->CreateBr(merge_bb);
+    else_bb = builder->GetInsertBlock();
+
+    // merge block
+    the_func->getBasicBlockList().push_back(merge_bb);
+    builder->SetInsertPoint(merge_bb);
+    return nullptr;
 }
 
 void ifstmt::yaml(ostream &os, string prefix) {
@@ -415,11 +486,15 @@ void ifstmt::yaml(ostream &os, string prefix) {
         else_statement->yaml(os, prefix + "  ");
 }
 
+Value *print::code_gen() {}
+
 void print::yaml(ostream &os, string prefix) {
         os << prefix << "name: print" << endl;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
 }
+
+Value *printslit::code_gen() {}
 
 void printslit::yaml(ostream &os, string prefix) {
         os << prefix << "name: printslit" << endl;
@@ -481,13 +556,15 @@ Function *func::code_gen() {
     unsigned i = 0;
     for (auto &arg : f->args()) {
         arg.setName(variable_declarations->variables[i]->getName());
+        name_to_Value[arg.getName()] = &arg;
     }
 
     // function body
-    BasicBlock *bb = BasicBlock::Create(context, "entry", f);
-    builder.SetInsertPoint(bb);
-    Value *ret_val = block->code_gen();
-    builder.CreateRet(ret_val);
+    BasicBlock *bb = BasicBlock::Create(*context, "entry", f);
+    builder->SetInsertPoint(bb);
+    block->code_gen();
+    if (rt->kind == type::t_void)
+        builder->CreateRetVoid();
     
     // verify the generated code
     if (verifyFunction(*f))
@@ -532,7 +609,7 @@ Function *ext::code_gen() {
 
     Type *ret_type = map_llvm_type(rt->kind);
     FunctionType *ft = FunctionType::get(ret_type, param_types, false);
-    Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module);
+    Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
 
     return f;
 }
@@ -555,19 +632,19 @@ void exts::yaml(ostream &os, string prefix) {
         }
 }
 
-prog::prog(funcs *f, exts *e) : functions(f), e(e) {
+prog::prog(funcs *f, exts *e) : functions(f), externs(e) {
     // Check there is a function named "run"
     if (function_table.count("run") == 0) error("Function 'run' not found.");
 }
 
 Module *prog::code_gen() {
-    if (e) {
-        for (ext *e_ptr : e->externs) 
-            e_ptr->code_gen();
+    if (externs) {
+        for (ext *e : externs->externs) 
+            e->code_gen();
     }
 
-    for (func *f_ptr : functions->functions) 
-        f_ptr->code_gen();
+    for (func *f : functions->functions) 
+        f->code_gen();
 
     return module.get();
 }
@@ -576,7 +653,7 @@ void prog::yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
         os << prefix << "funcs:" << endl;
         functions->yaml(os, prefix + "  ");
-        if (!e) return;
+        if (!externs) return;
         os << prefix << "externs: " << endl;
-        e->yaml(os, prefix + "  ");
+        externs->yaml(os, prefix + "  ");
 }
