@@ -26,8 +26,8 @@ static unordered_map<string, Value *> name_to_Value;    // Table of all Value* s
 
 // Classes for llvm code generation
 static unique_ptr<LLVMContext> context;
-static unique_ptr<IRBuilder<> > builder = llvm::make_unique<IRBuilder<> >(context);
-static unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", context);
+static unique_ptr<IRBuilder<> > builder = llvm::make_unique<IRBuilder<> >(*context);
+static unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", *context);
 
 // Helper function: map class type to llvm Type*
 Type *map_llvm_type(type::type_kind t) {
