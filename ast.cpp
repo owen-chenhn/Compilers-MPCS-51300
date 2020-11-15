@@ -25,7 +25,20 @@ static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared
 // Classes for llvm code generation
 static LLVMContext context;
 static IRBuilder<> builder(context);
-static std::unique_ptr<Module> module;
+static std::unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", context);
+
+// Helper function: map class type to llvm Type*
+Type *map_llvm_type(type::type_kind t) {
+    Type *type_ptr;
+    switch (t) {
+        case type::t_void  : type_ptr = Type::getVoidTy(context);  break;
+        case type::t_bool  : type_ptr = Type::getInt1Ty(context);  break;
+        case type::t_int   : type_ptr = Type::getInt32Ty(context); break;
+        case type::t_cint  : type_ptr = Type::getInt32Ty(context); break;
+        case type::t_float : type_ptr = Type::getFloatTy(context); break;
+    };
+    return type_ptr;
+}
 
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
@@ -354,6 +367,35 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     vdecl_table.clear();
 }
 
+Function *func::code_gen() {
+    unsigned params = variable_declarations ? variable_declarations->variables.size() : 0;
+    vector<Type *> param_types;
+    for (unsigned i = 0; i < params; i++) {
+        type::type_kind tkind = variable_declarations->variables[i]->getTypeKind();
+        param_types.push_back(map_llvm_type(tkind));
+    }
+
+    Type *ret_type = map_llvm_type(rt->kind);
+    FunctionType *ft = FunctionType::get(ret_type, param_types, true);
+    Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
+
+    unsigned i = 0;
+    for (auto &arg : f->args()) {
+        arg.setName(variable_declarations->variables[i]->getName());
+    }
+
+    // function body
+    BasicBlock *bb = BasicBlock::Create(context, "entry", f);
+    builder.SetInsertPoint(bb);
+    Value *ret_val = block->code_gen();
+    builder.CreateRet(ret_val);
+    
+    // verify the generated code
+    if (verifyFunction(*f))
+        error("Verification of code generation failed.");
+    return f;
+}
+
 void func::yaml(ostream &os, string prefix) {
         os << prefix << "name: func" << endl;
         os << prefix << "ret_type: " << rt->name() << endl;
@@ -379,6 +421,21 @@ ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     if (extern_table.count(globid->identifier)) error("Duplicate declaration of function '" + globid->identifier + "'.");
     if (rt->ref) error("Function should not return a reference.");
     extern_table[globid->identifier] = this;
+}
+
+Function *ext::code_gen() {
+    unsigned params = type_declarations ? type_declarations->types.size() : 0;
+    vector<Type *> param_types;
+    for (unsigned i = 0; i < params; i++) {
+        type::type_kind tkind = type_declarations->types[i]->kind;
+        param_types.push_back(map_llvm_type(tkind));
+    }
+
+    Type *ret_type = map_llvm_type(rt->kind);
+    FunctionType *ft = FunctionType::get(ret_type, param_types, false);
+    Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module);
+
+    return f;
 }
 
 void ext::yaml(ostream &os, string prefix) {

@@ -7,8 +7,10 @@
 #include <cassert>
 
 #include "llvm/IR/Value.h"
+#include "llvm/IR/Function.h"
 
 using namespace std;
+using namespace llvm;
 
 struct node {
     virtual void yaml(ostream &os, string prefix) = 0;
@@ -66,6 +68,7 @@ struct vdecl : public node {
 
     vdecl(type *t, id *var);
     string getName() { return variable->identifier; }
+    type::type_kind getTypeKind() { return tp->kind; }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -248,6 +251,8 @@ struct stmt : public node {
     virtual bool is_return() { return false; }
     // Check types of the statement's all expressions.
     virtual void check_exp() {}
+    //Generate code for the statement. 
+    virtual Value *code_gen() = 0;
 }; 
 
 struct stmts : public node {
@@ -271,6 +276,8 @@ struct blk : public stmt {
             for (stmt *st : statements->statements) st->check_exp();
         }
     }
+
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -369,6 +376,7 @@ struct func : public node {
     vdecls *variable_declarations;
 
     func(type *r, id *g, blk *b, vdecls *v = 0);
+    Function *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -391,6 +399,7 @@ struct ext : public node {
     tdecls *type_declarations;
 
     ext(type *r, id *g, tdecls *t = 0);
+    Function *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
