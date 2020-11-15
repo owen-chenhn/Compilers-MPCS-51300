@@ -129,6 +129,8 @@ struct lit : public exp {
     lit(int i): exp(new type(type::t_int)), it(i)  {}
 
     virtual void yaml(ostream &os, string prefix);
+
+    Value* code_gen();
 };
 
 struct flit : public exp {
@@ -137,6 +139,8 @@ struct flit : public exp {
     flit(float f): exp(new type(type::t_float)), flt(f) {}
 
     virtual void yaml(ostream &os, string prefix);
+
+    Value* code_gen();
 };
 
 struct varval : public exp {
@@ -147,6 +151,8 @@ struct varval : public exp {
     bool is_variable() { return true; }
 
     virtual void yaml(ostream &os, string prefix);
+
+    Value* code_gen();
 
     ~varval() { delete variable; }
 };
@@ -172,6 +178,8 @@ struct funccall : public exp {
 
     virtual void yaml(ostream &os, string prefix);
 
+    Value* code_gen();
+
     ~funccall() { delete globid; delete params; }
 };
 
@@ -194,6 +202,8 @@ struct uop : public exp {
     }
 
     virtual void yaml(ostream &os, string prefix);
+
+    Value* code_gen();
 
     ~uop() { delete expression; }
 };
@@ -232,6 +242,8 @@ struct binop : public exp {
 
     virtual void yaml(ostream &os, string prefix);
 
+    Value* code_gen();
+
     ~binop() { delete lhs; delete rhs; }
 };
 
@@ -240,9 +252,11 @@ struct castexp : public exp {
     exp *expression;
 
     castexp(type *t, exp *e): exp(t), tp(t), expression(e) {}
-    void check_type() { expression->check_type(); }
+    void check_type();
 
     virtual void yaml(ostream &os, string prefix);
+
+    Value* code_gen();
 
     ~castexp() { delete tp; delete expression; }
 };
