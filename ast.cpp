@@ -17,27 +17,35 @@
 #include "llvm/IR/Verifier.h"
 
 using namespace std;
+using namespace llvm;
 
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
+static unordered_map<string, Value *> name_to_Value;    // Table of all Value* s 
 
 // Classes for llvm code generation
-static LLVMContext context;
-static IRBuilder<> builder(context);
-static std::unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", context);
+static unique_ptr<LLVMContext> context;
+static unique_ptr<IRBuilder<> > builder = llvm::make_unique<IRBuilder<> >(context);
+static unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", context);
 
 // Helper function: map class type to llvm Type*
 Type *map_llvm_type(type::type_kind t) {
     Type *type_ptr;
     switch (t) {
-        case type::t_void  : type_ptr = Type::getVoidTy(context);  break;
-        case type::t_bool  : type_ptr = Type::getInt1Ty(context);  break;
-        case type::t_int   : type_ptr = Type::getInt32Ty(context); break;
-        case type::t_cint  : type_ptr = Type::getInt32Ty(context); break;
-        case type::t_float : type_ptr = Type::getFloatTy(context); break;
+        case type::t_void  : type_ptr = Type::getVoidTy(*context);  break;
+        case type::t_bool  : type_ptr = Type::getInt1Ty(*context);  break;
+        case type::t_int   : type_ptr = Type::getInt32Ty(*context); break;
+        case type::t_cint  : type_ptr = Type::getInt32Ty(*context); break;
+        case type::t_float : type_ptr = Type::getFloatTy(*context); break;
     };
     return type_ptr;
+}
+
+// method to print code gen log error and return Value * 
+Value *LogErrorV(const string& str) {
+    cout << "Error: " + str << endl;
+    return nullptr;
 }
 
 void type::check_and_make_ref() {
@@ -95,10 +103,18 @@ void lit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << it << endl;
 }
 
+Value* lit::code_gen() {
+    return ConstantInt::get(map_llvm_type(type::t_int), it);
+}
+
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "value: " << flt << endl;
+}
+
+Value* flit::code_gen() {
+    return ConstantFP::get(map_llvm_type(type::t_float), flt);
 }
 
 varval::varval(id *v) : exp(nullptr), variable(v) {
@@ -110,6 +126,12 @@ void varval::yaml(ostream &os, string prefix) {
         os << prefix << "name: varval" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "var: " << variable->identifier << endl;
+}
+
+Value* varval::code_gen() {
+    if (!name_to_Value.count(variable->identifier)) 
+        return LogErrorV("Unknown variable name");
+    return name_to_Value[variable->identifier];
 }
 
 void assign::check_type() {
@@ -186,6 +208,20 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
+Value* funccall::code_gen() {
+    Function* called_func = module->getFunction(globid->identifier);
+    if (!called_func) return LogErrorV("Unknown function referenced");
+
+    if (called_func->arg_size() != params->expressions.size()) return LogErrorV("Incorrect # of arguments");
+
+    vector<Value* > args;
+    for (int i = 0; i < params->expressions.size(); i++) {
+        args.push_back(params->expressions[i]->code_gen());
+    }
+
+    return builder->CreateCall(called_func, args, "calltmp");
+}
+
 void uop::check_type() {
     expression->check_type();
     if (kind == uop_not && expression->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
@@ -203,6 +239,11 @@ void uop::yaml(ostream &os, string prefix) {
         os << prefix << "op: " << kind_name() << endl; 
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
+}
+
+Value* uop::code_gen() {
+    if (kind == uop_not) return builder->CreateNot(expression->code_gen(), "nottmp");
+    return builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
 }
 
 void binop::check_type() {
@@ -237,12 +278,70 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
+Value* binop::code_gen() {
+    Value* L = lhs->code_gen();
+    Value* R = rhs->code_gen();
+
+    switch (kind) {
+        case bop_mul : 
+            return builder->CreateFAdd(L, R, "multmp");
+        case bop_div : 
+            return builder->CreateFDiv(L, R, "divtmp");
+        case bop_add : 
+            return builder->CreateFAdd(L, R, "addtmp");
+        case bop_sub : 
+            return builder->CreateFSub(L, R, "subtmp");
+        case bop_eq  : 
+            return builder->CreateFCmpUEQ(L, R, "eqtmp");
+        case bop_lt  : 
+            return builder->CreateFCmpULT(L, R, "lttmp");
+        case bop_gt  : 
+            return builder->CreateFCmpUGT(L, R, "gtmp");
+        case bop_and :
+            return builder->CreateAnd(L, R, "andtmp");
+        case bop_or  : 
+            return builder->CreateOr(L, R, "ortmp");           
+    };
+}
+
+void castexp::check_type() {
+    expression->check_type();
+    switch(expression->exp_type->kind) {
+        case type::t_int : 
+        case type::t_cint :
+        case type::t_float :
+            if (tp->kind == type::t_bool || tp->kind == type::t_void ) 
+                error(expression->exp_type->name() + 
+                " cannot be casted to " + 
+                expression->exp_type->name());
+            break;
+        case type::t_bool :
+            if (tp->kind != type::t_bool) error("Bool should be cast to only bool");
+            break;
+        default: 
+            error("Cannot cast void type.");
+    };
+}
+
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "type: " << tp->name() << endl;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
+}
+
+// assuming type check has already been performed 
+Value* castexp::code_gen() {
+    Value* e = expression->code_gen();
+    switch(tp->kind) {
+        case type::t_int :
+            return builder->CreateIntCast(e, map_llvm_type(type::t_int), false, "castinttmp");
+        case type::t_float:
+            return builder->CreateFPCast(e, map_llvm_type(type::t_float), "castfloattmp");
+        case type::t_bool:
+            return e;
+    }
 }
 
 void stmts::yaml(ostream &os, string prefix) {
