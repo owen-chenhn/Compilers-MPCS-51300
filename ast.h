@@ -8,6 +8,7 @@
 
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module"
 
 using namespace std;
 using namespace llvm;
@@ -421,6 +422,7 @@ struct prog : public node {
     exts *e;
 
     prog(funcs *f, exts *e = 0);
+    Module *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 

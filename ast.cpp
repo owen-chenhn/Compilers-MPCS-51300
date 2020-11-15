@@ -461,6 +461,18 @@ prog::prog(funcs *f, exts *e) : functions(f), e(e) {
     if (function_table.count("run") == 0) error("Function 'run' not found.");
 }
 
+Module *prog::code_gen() {
+    if (e) {
+        for (ext *e_ptr : e->externs) 
+            e_ptr->code_gen();
+    }
+
+    for (func *f_ptr : functions->functions) 
+        f_ptr->code_gen();
+
+    return module.get();
+}
+
 void prog::yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
         os << prefix << "funcs:" << endl;
