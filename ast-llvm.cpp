@@ -17,6 +17,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace std;
 using namespace llvm;
@@ -231,9 +232,29 @@ Value *ifstmt::code_gen() {
     return Constant::getNullValue(Type::getVoidTy(*context));
 }
 
-Value *print::code_gen() {}
+Value *print::code_gen() {
+    Value *exp_v = expression->code_gen();
+    vector<Value *> args = { exp_v };
+    string func_name = (expression->exp_type->kind == type::t_float) ? 
+                        "printFloat" : 
+                        "printInt";
 
-Value *printslit::code_gen() {}
+    Function* printFunc = module->getFunction(func_name);
+    if (!printFunc) return LogErrorV("Function " + func_name + " undeclared");
+
+    return builder->CreateCall(printFunc, args, "callprint");
+}
+
+Value *printslit::code_gen() {
+    // generate code for string
+    Value *str_v = builder->CreateGlobalStringPtr(StringRef(str));
+
+    Function* printFunc = module->getFunction("printStr");
+    if (!printFunc) return LogErrorV("Function printStr undeclared");
+
+    vector<Value *> args = { str_v };
+    return builder->CreateCall(printFunc, args, "callprintStr");
+}
 
 Function *func::code_gen() {
     unsigned params = variable_declarations ? variable_declarations->variables.size() : 0;
@@ -244,7 +265,7 @@ Function *func::code_gen() {
     }
 
     Type *ret_type = map_llvm_type(rt->kind);
-    FunctionType *ft = FunctionType::get(ret_type, param_types, true);
+    FunctionType *ft = FunctionType::get(ret_type, param_types, false);
     Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
 
     unsigned i = 0;
@@ -288,11 +309,32 @@ Function *ext::code_gen() {
     return f;
 }
 
+
+/* Helper functions to declare library print functions. */
+static void declare_print_functions() {
+    // declare printStr
+    vector<Type *> args = { Type::getInt8PtrTy(*context) };
+    FunctionType *ft = FunctionType::get(Type::getVoidTy(*context), args, false);
+    module->getOrInsertFunction("printStr", ft);
+
+    // declare printInt
+    args.clear();
+    args.push_back(Type::getInt32Ty(*context));
+    module->getOrInsertFunction("printInt", FunctionType::get(Type::getVoidTy(*context), args, false));
+
+    // declare printFloat
+    args.clear();
+    args.push_back(Type::getFloatTy(*context));
+    module->getOrInsertFunction("printFloat", FunctionType::get(Type::getVoidTy(*context), args, false));
+}
+
 Module *prog::code_gen() {
     if (externs) {
         for (ext *e : externs->externs) 
             e->code_gen();
     }
+
+    declare_print_functions();
 
     for (func *f : functions->functions) 
         f->code_gen();
