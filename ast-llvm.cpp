@@ -47,6 +47,12 @@ Value *LogErrorV(const string& str) {
     return nullptr;
 }
 
+// method to print code gen log error and return Function * 
+Function *LogErrorF(const string& str) {
+    cout << "Error: " + str << endl;
+    return nullptr;
+}
+
 AllocaInst *vdecl::code_gen() {
     AllocaInst *alloc_var = builder->CreateAlloca(map_llvm_type(tp->kind), 
                                     nullptr, variable->identifier);
@@ -262,7 +268,7 @@ Function *func::code_gen() {
     
     // verify the generated code
     if (verifyFunction(*f))
-        error("Verification of code generation failed.");
+        return LogErrorF("Verification of code generation failed.");
     return f;
 }
 
