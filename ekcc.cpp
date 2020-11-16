@@ -112,13 +112,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (emit_llvm) {
-        context = make_unique<LLVMContext>();
-        module = make_unique<Module>("EKProgram", *context);
-        builder = make_unique<IRBuilder<> >(*context);
-
-        the_prog->code_gen();
-
-        module->print(errs(), nullptr);
+        the_prog->code_gen()->print(errs(), nullptr);
     }
 
     delete the_prog;
