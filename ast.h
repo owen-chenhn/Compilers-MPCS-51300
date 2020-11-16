@@ -16,10 +16,6 @@ using namespace llvm;
 struct node {
     virtual void yaml(ostream &os, string prefix) = 0;
     virtual ~node() {}
-    virtual void error(string err_msg) {
-        cout << "error: " << err_msg << endl;
-        exit(1);
-    }
 };
 
 struct type {
@@ -35,25 +31,9 @@ struct type {
 
     type(type_kind kd) : kind(kd), ref(false), noalias(false) {}
 
-    string name() {
-        string nm;
-        if (noalias) nm += "noalias ";
-        if (ref) nm += "ref ";
-
-        switch (kind) {
-            case t_void : nm += "void" ;break; 
-            case t_bool : nm += "bool" ;break;   
-            case t_int  : nm += "int"  ;break;
-            case t_cint : nm += "cint" ;break; 
-            case t_float: nm += "float";break;
-        }
-
-        return nm;
-    }
+    string name();
 
     void check_and_make_ref();
-
-    void error(const string& err_msg);
 };
 
 // type of varid and globid

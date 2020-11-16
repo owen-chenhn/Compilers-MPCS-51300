@@ -5,59 +5,37 @@
 #include <iostream>
 #include <type_traits>
 
-#include "llvm/IR/Type.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Value.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
-
 using namespace std;
-using namespace llvm;
 
 static unordered_map<string, func *> function_table;    // Table of all the declared functions.
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
-static unordered_map<string, Value *> name_to_Value;    // Table of all Value* s 
 
-// Classes for llvm code generation
-static unique_ptr<LLVMContext> context;
-static unique_ptr<IRBuilder<> > builder = llvm::make_unique<IRBuilder<> >(*context);
-static unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", *context);
-
-// Helper function: map class type to llvm Type*
-Type *map_llvm_type(type::type_kind t) {
-    Type *type_ptr;
-    switch (t) {
-        case type::t_void  : type_ptr = Type::getVoidTy(*context);  break;
-        case type::t_bool  : type_ptr = Type::getInt1Ty(*context);  break;
-        case type::t_int   : type_ptr = Type::getInt32Ty(*context); break;
-        case type::t_cint  : type_ptr = Type::getInt32Ty(*context); break;
-        case type::t_float : type_ptr = Type::getFloatTy(*context); break;
-    };
-    return type_ptr;
+static void error(const string& err_msg) {
+    cout << "error: " << err_msg << endl;
+    exit(1);
 }
 
-// method to print code gen log error and return Value * 
-Value *LogErrorV(const string& str) {
-    cout << "Error: " + str << endl;
-    return nullptr;
+string type::name() {
+    string nm;
+    if (noalias) nm += "noalias ";
+    if (ref) nm += "ref ";
+
+    switch (kind) {
+        case t_void : nm += "void" ;break; 
+        case t_bool : nm += "bool" ;break;   
+        case t_int  : nm += "int"  ;break;
+        case t_cint : nm += "cint" ;break; 
+        case t_float: nm += "float";break;
+    }
+
+    return nm;
 }
 
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
     if (kind == type::t_void) error("Ref type may not refer to void type.");
     ref = true;
-}
-
-void type::error(const string& err_msg) {
-    cout << "error: " << err_msg << endl;
-    exit(1);
 }
 
 vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
@@ -104,18 +82,10 @@ void lit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << it << endl;
 }
 
-Value* lit::code_gen() {
-    return ConstantInt::get(map_llvm_type(type::t_int), it);
-}
-
 void flit::yaml(ostream &os, string prefix) {
         os << prefix << "name: flit" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "value: " << flt << endl;
-}
-
-Value* flit::code_gen() {
-    return ConstantFP::get(map_llvm_type(type::t_float), flt);
 }
 
 varval::varval(id *v) : exp(nullptr), variable(v) {
@@ -127,12 +97,6 @@ void varval::yaml(ostream &os, string prefix) {
         os << prefix << "name: varval" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "var: " << variable->identifier << endl;
-}
-
-Value* varval::code_gen() {
-    if (!name_to_Value.count(variable->identifier)) 
-        return LogErrorV("Unknown variable name");
-    return name_to_Value[variable->identifier];
 }
 
 void assign::check_type() {
@@ -209,20 +173,6 @@ void funccall::yaml(ostream &os, string prefix) {
         params->yaml(os, prefix + "  ");
 }
 
-Value* funccall::code_gen() {
-    Function* called_func = module->getFunction(globid->identifier);
-    if (!called_func) return LogErrorV("Unknown function referenced");
-
-    if (called_func->arg_size() != params->expressions.size()) return LogErrorV("Incorrect # of arguments");
-
-    vector<Value* > args;
-    for (int i = 0; i < params->expressions.size(); i++) {
-        args.push_back(params->expressions[i]->code_gen());
-    }
-
-    return builder->CreateCall(called_func, args, "calltmp");
-}
-
 void uop::check_type() {
     expression->check_type();
     if (kind == uop_not && expression->exp_type->kind != type::t_bool) error("Bitwise negation (!) must be applied to bools.");
@@ -240,11 +190,6 @@ void uop::yaml(ostream &os, string prefix) {
         os << prefix << "op: " << kind_name() << endl; 
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
-}
-
-Value* uop::code_gen() {
-    if (kind == uop_not) return builder->CreateNot(expression->code_gen(), "nottmp");
-    return builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
 }
 
 void binop::check_type() {
@@ -279,32 +224,6 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
-Value* binop::code_gen() {
-    Value* L = lhs->code_gen();
-    Value* R = rhs->code_gen();
-
-    switch (kind) {
-        case bop_mul : 
-            return builder->CreateFAdd(L, R, "multmp");
-        case bop_div : 
-            return builder->CreateFDiv(L, R, "divtmp");
-        case bop_add : 
-            return builder->CreateFAdd(L, R, "addtmp");
-        case bop_sub : 
-            return builder->CreateFSub(L, R, "subtmp");
-        case bop_eq  : 
-            return builder->CreateFCmpUEQ(L, R, "eqtmp");
-        case bop_lt  : 
-            return builder->CreateFCmpULT(L, R, "lttmp");
-        case bop_gt  : 
-            return builder->CreateFCmpUGT(L, R, "gtmp");
-        case bop_and :
-            return builder->CreateAnd(L, R, "andtmp");
-        case bop_or  : 
-            return builder->CreateOr(L, R, "ortmp");           
-    };
-}
-
 void castexp::check_type() {
     expression->check_type();
     switch(expression->exp_type->kind) {
@@ -332,19 +251,6 @@ void castexp::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-// assuming type check has already been performed 
-Value* castexp::code_gen() {
-    Value* e = expression->code_gen();
-    switch(tp->kind) {
-        case type::t_int :
-            return builder->CreateIntCast(e, map_llvm_type(type::t_int), false, "castinttmp");
-        case type::t_float:
-            return builder->CreateFPCast(e, map_llvm_type(type::t_float), "castfloattmp");
-        case type::t_bool:
-            return e;
-    }
-}
-
 void stmts::yaml(ostream &os, string prefix) {
         os << prefix << "name: stmts" << endl;       
         os << prefix << "stmts:" << endl;
@@ -359,16 +265,6 @@ void blk::yaml(ostream &os, string prefix) {
         if (!statements) return;
         os << prefix << "contents:" << endl;
         statements->yaml(os, prefix + "  ");
-}
-
-Value *ret::code_gen() {
-    if (expression) {
-        Value *exp_v = expression->code_gen();
-        if (!exp_v) return nullptr;
-        return builder->CreateRet(exp_v);
-    }
-    else
-        return builder->CreateRetVoid();
 }
 
 void ret::yaml(ostream &os, string prefix) {
@@ -393,14 +289,6 @@ void vdeclstmt::check_exp() {
     }
 }
 
-Value *vdeclstmt::code_gen() {
-    Value *exp_v = expression->code_gen();
-    if (!exp_v) return nullptr;
-
-    name_to_Value[variable->getName()] = exp_v;
-    return exp_v;
-}
-
 void vdeclstmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: vardeclstmt" << endl;
         os << prefix << "vdecl:" << endl;
@@ -415,65 +303,12 @@ void expstmt::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-Value *whilestmt::code_gen() {
-    Function *the_func = builder->GetInsertBlock()->getParent();
-    BasicBlock *head_bb = BasicBlock::Create(*context, "loop_head", the_func), 
-               *body_bb = BasicBlock::Create(*context, "loop_body"), 
-               *exit_bb = BasicBlock::Create(*context, "loop_exit");
-    
-    builder->CreateBr(head_bb);
-    builder->SetInsertPoint(head_bb);
-    Value *cond_v = condition->code_gen();
-    if (!cond_v) return nullptr;
-    builder->CreateCondBr(cond_v, body_bb, exit_bb);
-
-    // loop body
-    the_func->getBasicBlockList().push_back(body_bb);
-    builder->SetInsertPoint(body_bb);
-    statement->code_gen();
-    builder->CreateBr(head_bb);
-
-    // loop exit
-    the_func->getBasicBlockList().push_back(exit_bb);
-    builder->SetInsertPoint(exit_bb);
-    return Constant::getNullValue(Type::getVoidTy(*context));
-}
-
 void whilestmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: while" << endl;
         os << prefix << "cond: " << endl;
         condition->yaml(os, prefix + "  ");
         os << prefix << "stmt: " << endl;
         statement->yaml(os, prefix + "  ");
-}
-
-Value *ifstmt::code_gen() {
-    Value *cond_v = condition->code_gen();
-    if (!cond_v) return nullptr;
-
-    Function *the_func = builder->GetInsertBlock()->getParent();
-    BasicBlock *then_bb = BasicBlock::Create(*context, "then", the_func), 
-               *else_bb = BasicBlock::Create(*context, "else"), 
-               *merge_bb = BasicBlock::Create(*context, "if_exit");
-    builder->CreateCondBr(cond_v, then_bb, else_bb);
-
-    // insert then's code
-    builder->SetInsertPoint(then_bb);
-    Value *then_v = statement->code_gen();
-    builder->CreateBr(merge_bb);
-    then_bb = builder->GetInsertBlock();
-
-    // insert else's code
-    the_func->getBasicBlockList().push_back(else_bb);
-    builder->SetInsertPoint(else_bb);
-    if (else_statement) else_statement->code_gen();
-    builder->CreateBr(merge_bb);
-    else_bb = builder->GetInsertBlock();
-
-    // merge block
-    the_func->getBasicBlockList().push_back(merge_bb);
-    builder->SetInsertPoint(merge_bb);
-    return Constant::getNullValue(Type::getVoidTy(*context));
 }
 
 void ifstmt::yaml(ostream &os, string prefix) {
@@ -487,15 +322,11 @@ void ifstmt::yaml(ostream &os, string prefix) {
         else_statement->yaml(os, prefix + "  ");
 }
 
-Value *print::code_gen() {}
-
 void print::yaml(ostream &os, string prefix) {
         os << prefix << "name: print" << endl;
         os << prefix << "exp:" << endl;
         expression->yaml(os, prefix + "  ");
 }
-
-Value *printslit::code_gen() {}
 
 void printslit::yaml(ostream &os, string prefix) {
         os << prefix << "name: printslit" << endl;
@@ -542,37 +373,6 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
     vdecl_table.clear();
 }
 
-Function *func::code_gen() {
-    unsigned params = variable_declarations ? variable_declarations->variables.size() : 0;
-    vector<Type *> param_types;
-    for (unsigned i = 0; i < params; i++) {
-        type::type_kind tkind = variable_declarations->variables[i]->getTypeKind();
-        param_types.push_back(map_llvm_type(tkind));
-    }
-
-    Type *ret_type = map_llvm_type(rt->kind);
-    FunctionType *ft = FunctionType::get(ret_type, param_types, true);
-    Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
-
-    unsigned i = 0;
-    for (auto &arg : f->args()) {
-        arg.setName(variable_declarations->variables[i]->getName());
-        name_to_Value[arg.getName()] = &arg;
-    }
-
-    // function body
-    BasicBlock *bb = BasicBlock::Create(*context, "entry", f);
-    builder->SetInsertPoint(bb);
-    block->code_gen();
-    if (rt->kind == type::t_void)
-        builder->CreateRetVoid();
-    
-    // verify the generated code
-    if (verifyFunction(*f))
-        error("Verification of code generation failed.");
-    return f;
-}
-
 void func::yaml(ostream &os, string prefix) {
         os << prefix << "name: func" << endl;
         os << prefix << "ret_type: " << rt->name() << endl;
@@ -600,21 +400,6 @@ ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
     extern_table[globid->identifier] = this;
 }
 
-Function *ext::code_gen() {
-    unsigned params = type_declarations ? type_declarations->types.size() : 0;
-    vector<Type *> param_types;
-    for (unsigned i = 0; i < params; i++) {
-        type::type_kind tkind = type_declarations->types[i]->kind;
-        param_types.push_back(map_llvm_type(tkind));
-    }
-
-    Type *ret_type = map_llvm_type(rt->kind);
-    FunctionType *ft = FunctionType::get(ret_type, param_types, false);
-    Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
-
-    return f;
-}
-
 void ext::yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
         os << prefix << "ret_type: " << rt->name() << endl;
@@ -636,18 +421,6 @@ void exts::yaml(ostream &os, string prefix) {
 prog::prog(funcs *f, exts *e) : functions(f), externs(e) {
     // Check there is a function named "run"
     if (function_table.count("run") == 0) error("Function 'run' not found.");
-}
-
-Module *prog::code_gen() {
-    if (externs) {
-        for (ext *e : externs->externs) 
-            e->code_gen();
-    }
-
-    for (func *f : functions->functions) 
-        f->code_gen();
-
-    return module.get();
 }
 
 void prog::yaml(ostream &os, string prefix) {
