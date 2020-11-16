@@ -2,7 +2,7 @@ CXXFLAG = -Wall -Wextra -pedantic -std=c++11 -g
 
 all: ekcc
 
-ekcc: parser lexer ast main
+ekcc: parser lexer ast ast-llvm main
 	rm -f bin/ekcc
 	$(CXX) $(CXXFLAG) -o bin/ekcc bin/*
 
@@ -16,6 +16,9 @@ lexer: lexer.l parser
 
 ast: ast.cpp ast.h
 	$(CXX) $(CXXFLAG) -c -o bin/ast.o ast.cpp
+
+ast-llvm: ast-llvm.cpp ast.h
+	$(CXX) $(CXXFLAG) -c -o bin/ast-llvm.o ast-llvm.cpp
 
 main: ekcc.cpp ekcc.h ast.h parser
 	$(CXX) $(CXXFLAG) -c -o bin/main.o ekcc.cpp
