@@ -87,7 +87,7 @@ void flit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << flt << endl;
 }
 
-varval::varval(id *v) : exp(nullptr), variable(v) {
+varval::varval(id *v) : expr(nullptr), variable(v) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
 }
@@ -117,13 +117,13 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-funccall::funccall(id* gid, exps *p) : exp(nullptr), globid(gid), params(p) {
+funccall::funccall(id* gid, exps *p) : expr(nullptr), globid(gid), params(p) {
     if (!p) params = new exps();
 }
 
 void funccall::check_type() {
     if (params) {
-        for (exp *expr : params->expressions) expr->check_type(); 
+        for (expr *e : params->expressions) e->check_type(); 
     }
     
     bool flag;
@@ -148,8 +148,8 @@ void funccall::check_type() {
                 to_string(num_params) + ".");
     }
     for (unsigned i = 0; i < num_decls; i++) {
-        exp *expr = params->expressions[i];
-        type *exp_tp  = expr->exp_type, 
+        expr *ex = params->expressions[i];
+        type *exp_tp  = ex->exp_type, 
              *decl_tp = flag ? f->variable_declarations->variables[i]->tp 
                              : e->type_declarations->types[i];
         if (exp_tp->kind != decl_tp->kind) {
@@ -157,7 +157,7 @@ void funccall::check_type() {
                   "' got wrong argument type. Argument " + to_string(i+1) + 
                   " should be " + decl_tp->name() + " but got " + exp_tp->name());
         }
-        if (decl_tp->ref && !expr->is_variable()) {
+        if (decl_tp->ref && !ex->is_variable()) {
             error("Function '" + globid->identifier + 
                   "' expects variable (lvalue) for its reference argument " + 
                   to_string(i+1) + ".");
@@ -277,7 +277,7 @@ void ret::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
+vdeclstmt::vdeclstmt(vdecl *v, expr *e) : variable(v), expression(e) {
     if (v->tp->ref && !e->is_variable()) {
         //if (!is_same<varval, decltype(*e)>::value) 
         error("Ref variable initilization expression must be a variable.");

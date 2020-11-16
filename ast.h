@@ -79,10 +79,10 @@ struct vdecls : public node {
 };
 
 
-struct exp : public node {
+struct expr : public node {
     type *exp_type;
 
-    exp(type *t): exp_type(t) {}
+    expr(type *t): exp_type(t) {}
 
     // Check whether this expression is a variable (lvalue) or not (rvalue). 
     // Only when exp is a struct varval, this function returns true. 
@@ -96,36 +96,36 @@ struct exp : public node {
 };
 
 struct exps : public node {
-    vector<exp *> expressions;
+    vector<expr *> expressions;
 
     virtual void yaml(ostream &os, string prefix);
 
     ~exps() {
-        for (auto exp : expressions) { delete exp; }
+        for (auto e : expressions) { delete e; }
     }
 };
 
-struct lit : public exp {
+struct lit : public expr {
     int it;
 
-    lit(int i): exp(new type(type::t_int)), it(i)  {}
+    lit(int i): expr(new type(type::t_int)), it(i)  {}
 
     virtual void yaml(ostream &os, string prefix);
 
     Value* code_gen();
 };
 
-struct flit : public exp {
+struct flit : public expr {
     float flt;
 
-    flit(float f): exp(new type(type::t_float)), flt(f) {}
+    flit(float f): expr(new type(type::t_float)), flt(f) {}
 
     virtual void yaml(ostream &os, string prefix);
 
     Value* code_gen();
 };
 
-struct varval : public exp {
+struct varval : public expr {
     id *variable;
 
     varval(id *v);
@@ -139,11 +139,11 @@ struct varval : public exp {
     ~varval() { delete variable; }
 };
 
-struct assign : public exp {
+struct assign : public expr {
     varval *variable;
-    exp *expression;
+    expr *expression;
 
-    assign(varval *v, exp *e): exp(v->exp_type), variable(v), expression(e) {}
+    assign(varval *v, expr *e): expr(v->exp_type), variable(v), expression(e) {}
     void check_type();
     Value *code_gen();
 
@@ -152,11 +152,11 @@ struct assign : public exp {
     ~assign() { delete variable; delete expression; }
 };
 
-struct funccall : public exp {
+struct funccall : public expr {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0): exp(nullptr), globid(gid), params(p) {}
+    funccall(id *gid, exps *p = 0);
     void check_type();
 
     virtual void yaml(ostream &os, string prefix);
@@ -166,15 +166,15 @@ struct funccall : public exp {
     ~funccall() { delete globid; delete params; }
 };
 
-struct uop : public exp {
+struct uop : public expr {
     enum uop_kind {
         uop_not,
         uop_minus,
     } kind;
 
-    exp *expression;
+    expr *expression;
 
-    uop(uop_kind kd, exp *e): exp(nullptr), kind(kd), expression(e) {}
+    uop(uop_kind kd, expr *e): expr(nullptr), kind(kd), expression(e) {}
     void check_type();
 
     string kind_name() {
@@ -191,7 +191,7 @@ struct uop : public exp {
     ~uop() { delete expression; }
 };
 
-struct binop : public exp {
+struct binop : public expr {
     enum binop_kind {
         bop_mul,
         bop_div,
@@ -204,9 +204,9 @@ struct binop : public exp {
         bop_or
     } kind;
 
-    exp *lhs, *rhs; 
+    expr *lhs, *rhs; 
 
-    binop(binop_kind kd, exp *left, exp *right): exp(nullptr), kind(kd), lhs(left), rhs(right) {}
+    binop(binop_kind kd, expr *left, expr *right): expr(nullptr), kind(kd), lhs(left), rhs(right) {}
     void check_type();
 
     string kind_name() {
@@ -230,11 +230,11 @@ struct binop : public exp {
     ~binop() { delete lhs; delete rhs; }
 };
 
-struct castexp : public exp {
+struct castexp : public expr {
     type *tp;
-    exp *expression;
+    expr *expression;
 
-    castexp(type *t, exp *e): exp(t), tp(t), expression(e) {}
+    castexp(type *t, expr *e): expr(t), tp(t), expression(e) {}
     void check_type();
 
     virtual void yaml(ostream &os, string prefix);
@@ -291,9 +291,9 @@ struct blk : public stmt {
 };
 
 struct ret : public stmt {
-    exp *expression;
+    expr *expression;
 
-    ret(exp *e = 0): expression(e) {}
+    ret(expr *e = 0): expression(e) {}
     bool is_return() { return true; }
     void check_exp() { if (expression) expression->check_type(); }
     Value *code_gen();
@@ -305,9 +305,9 @@ struct ret : public stmt {
 
 struct vdeclstmt : public stmt {
     vdecl *variable;
-    exp *expression;
+    expr *expression;
 
-    vdeclstmt(vdecl *v, exp *e);
+    vdeclstmt(vdecl *v, expr *e);
     void check_exp();
     Value *code_gen();
 
@@ -317,9 +317,9 @@ struct vdeclstmt : public stmt {
 };
 
 struct expstmt : public stmt {
-    exp *expression;
+    expr *expression;
 
-    expstmt(exp *e) : expression(e) {}
+    expstmt(expr *e) : expression(e) {}
     void check_exp() { expression->check_type(); }
     Value *code_gen() { return expression->code_gen(); }
 
@@ -329,10 +329,10 @@ struct expstmt : public stmt {
 };
 
 struct whilestmt : public stmt {
-    exp *condition;
+    expr *condition;
     stmt *statement;
     
-    whilestmt(exp *c, stmt *s) : condition(c), statement(s) {}
+    whilestmt(expr *c, stmt *s) : condition(c), statement(s) {}
     void check_exp() { condition->check_type(); statement->check_exp(); }
     Value *code_gen();
 
@@ -342,11 +342,11 @@ struct whilestmt : public stmt {
 };
 
 struct ifstmt : public stmt {
-    exp *condition;
+    expr *condition;
     stmt *statement;
     stmt *else_statement;
 
-    ifstmt(exp *e, stmt *s, stmt *es = 0) : 
+    ifstmt(expr *e, stmt *s, stmt *es = 0) : 
         condition(e), statement(s), else_statement(es) {}
 
     void check_exp() { 
@@ -362,9 +362,9 @@ struct ifstmt : public stmt {
 };
 
 struct print : public stmt {
-    exp *expression;
+    expr *expression;
     
-    print(exp *e) : expression(e) {}
+    print(expr *e) : expression(e) {}
     void check_exp() { expression->check_type(); }
     Value *code_gen();
 

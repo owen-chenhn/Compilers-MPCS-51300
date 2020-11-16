@@ -30,7 +30,7 @@
     struct vdecl *a_vdecl;
     struct tdecls *a_tdecls;
     struct vdecls *a_vdecls;
-    struct exp *a_exp;
+    struct expr *a_exp;
     struct uop *a_uop;
     struct binop *a_binop;
     struct assign *a_assign;
@@ -66,7 +66,7 @@
 %type <a_uop> uop 
 %type <a_binop> binop 
 %type <a_assign> assign 
-%type <a_exp> exp 
+%type <a_exp> exp
 %type <a_exps> exps 
 %type <a_stmt> stmt 
 %type <a_stmts> stmts 
