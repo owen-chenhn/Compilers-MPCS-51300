@@ -421,6 +421,7 @@ Value *whilestmt::code_gen() {
                *body_bb = BasicBlock::Create(*context, "loop_body"), 
                *exit_bb = BasicBlock::Create(*context, "loop_exit");
     
+    builder->CreateBr(head_bb);
     builder->SetInsertPoint(head_bb);
     Value *cond_v = condition->code_gen();
     if (!cond_v) return nullptr;
@@ -435,7 +436,7 @@ Value *whilestmt::code_gen() {
     // loop exit
     the_func->getBasicBlockList().push_back(exit_bb);
     builder->SetInsertPoint(exit_bb);
-    return nullptr;
+    return Constant::getNullValue(Type::getVoidTy(*context));
 }
 
 void whilestmt::yaml(ostream &os, string prefix) {
@@ -453,7 +454,7 @@ Value *ifstmt::code_gen() {
     Function *the_func = builder->GetInsertBlock()->getParent();
     BasicBlock *then_bb = BasicBlock::Create(*context, "then", the_func), 
                *else_bb = BasicBlock::Create(*context, "else"), 
-               *merge_bb = BasicBlock::Create(*context, "ifcont");
+               *merge_bb = BasicBlock::Create(*context, "if_exit");
     builder->CreateCondBr(cond_v, then_bb, else_bb);
 
     // insert then's code
@@ -472,7 +473,7 @@ Value *ifstmt::code_gen() {
     // merge block
     the_func->getBasicBlockList().push_back(merge_bb);
     builder->SetInsertPoint(merge_bb);
-    return nullptr;
+    return Constant::getNullValue(Type::getVoidTy(*context));
 }
 
 void ifstmt::yaml(ostream &os, string prefix) {
