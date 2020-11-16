@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <iostream>
+#include <memory>
 
 #include "llvm/IR/Type.h"
 #include "llvm/IR/BasicBlock.h"
@@ -24,9 +25,9 @@ using namespace llvm;
 static unordered_map<string, AllocaInst *> name_to_Value;
 
 // Classes for llvm code generation
-static unique_ptr<LLVMContext> context;
-static unique_ptr<IRBuilder<> > builder = llvm::make_unique<IRBuilder<> >(*context);
-static unique_ptr<Module> module = llvm::make_unique<Module>("EKProgram", *context);
+unique_ptr<LLVMContext> context = make_unique<LLVMContext>();
+unique_ptr<IRBuilder<> > builder = make_unique<IRBuilder<> >(*context);
+unique_ptr<Module> module = make_unique<Module>("EKProgram", *context);
 
 // Helper function: map class type to llvm Type*
 Type *map_llvm_type(type::type_kind t) {
@@ -256,7 +257,6 @@ Function *func::code_gen() {
     builder->SetInsertPoint(bb);
     // Setup function argument variables
     name_to_Value.clear();
-    unsigned i = 0;
     for (auto &arg : f->args()) {
         AllocaInst *alloc_param = variable_declarations->variables[i++]->code_gen();
         builder->CreateStore(&arg, alloc_param);
