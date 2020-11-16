@@ -96,7 +96,9 @@ Value* funccall::code_gen() {
 
 Value* uop::code_gen() {
     if (kind == uop_not) return builder->CreateNot(expression->code_gen(), "nottmp");
-    return builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
+    return expression->exp_type->kind == type::t_float ? 
+           builder->CreateFNeg(expression->code_gen(), "negfptmp") : 
+           builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
 }
 
 Value* binop::code_gen() {
@@ -105,19 +107,31 @@ Value* binop::code_gen() {
 
     switch (kind) {
         case bop_mul : 
-            return builder->CreateFAdd(L, R, "multmp");
+            return lhs->exp_type->kind == type::t_float ?
+                   builder->CreateFMul(L, R, "mulfptmp") : 
+                   builder->CreateMul(L, R, "multmp", true, true);
         case bop_div : 
-            return builder->CreateFDiv(L, R, "divtmp");
+            return builder->CreateFDiv(L, R, "divfptmp");
         case bop_add : 
-            return builder->CreateFAdd(L, R, "addtmp");
+            return lhs->exp_type->kind == type::t_float ?
+                   builder->CreateFAdd(L, R, "addfptmp") : 
+                   builder->CreateAdd(L, R, "addtmp", true, true);
         case bop_sub : 
-            return builder->CreateFSub(L, R, "subtmp");
+            return lhs->exp_type->kind == type::t_float ?
+                   builder->CreateFSub(L, R, "subfptmp") : 
+                   builder->CreateSub(L, R, "subtmp", true, true);
         case bop_eq  : 
-            return builder->CreateFCmpUEQ(L, R, "eqtmp");
+            return lhs->exp_type->kind == type::t_float ?
+                   builder->CreateFCmpUEQ(L, R, "eqfptmp") : 
+                   builder->CreateICmpEQ(L, R, "eqtmp");
         case bop_lt  : 
-            return builder->CreateFCmpULT(L, R, "lttmp");
+            return lhs->exp_type->kind == type::t_float ?
+                   builder->CreateFCmpULT(L, R, "ltfptmp") : 
+                   builder->CreateICmpULT(L, R, "lttmp");
         case bop_gt  : 
-            return builder->CreateFCmpUGT(L, R, "gtmp");
+            return lhs->exp_type->kind == type::t_float ?
+                   builder->CreateFCmpUGT(L, R, "gtfptmp") : 
+                   builder->CreateICmpUGT(L, R, "gttmp");
         case bop_and :
             return builder->CreateAnd(L, R, "andtmp");
         case bop_or  : 
