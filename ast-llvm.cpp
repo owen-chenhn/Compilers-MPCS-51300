@@ -257,6 +257,7 @@ Function *func::code_gen() {
     builder->SetInsertPoint(bb);
     // Setup function argument variables
     name_to_Value.clear();
+    i = 0;
     for (auto &arg : f->args()) {
         AllocaInst *alloc_param = variable_declarations->variables[i++]->code_gen();
         builder->CreateStore(&arg, alloc_param);
