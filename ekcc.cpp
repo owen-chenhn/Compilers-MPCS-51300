@@ -94,9 +94,18 @@ int main(int argc, char* argv[]) {
     }
     yyin = in_f;
 
+    if (verbose) {
+        Header();
+        cout << "Input file path: " << argv[optind] << "\nStarting parsing input program and build AST.\n";
+    }
+
     do {
         yyparse();
     } while (!feof(yyin)); 
+
+    if (verbose) {
+        cout << "Finished input parsing.\n";
+    }
 
     ofstream os(output, ios::out);
     if (!os) {
@@ -105,13 +114,22 @@ int main(int argc, char* argv[]) {
     }
 
     if (emit_ast) {
+        if (verbose) cout << "Emit AST to output file: " << output << endl;
         os << "---" << endl;
         the_prog->yaml(os, "");
         os << "..." << endl;
+        if (verbose) cout << "Finished emitting AST.\n";
     }
 
+    if (verbose) cout << "Start generating LLVM IR code.\n";
+    llvm::Module *the_module = the_prog->code_gen();
+    the_module->print(errs(), nullptr);
+    if (verbose) cout << "Finished generating LLVM IR code.\n";
+
     if (emit_llvm) {
-        the_prog->code_gen()->print(errs(), nullptr);
+        if (verbose) cout << "Emit LLVM IR code to output file: " << output << endl;
+        
+        if (verbose) cout << "Finished emitting LLVM IR code.\n";
     }
 
     delete the_prog;
