@@ -3,10 +3,15 @@
 #include <string>
 #include <getopt.h> 
 #include <fstream>
+#include <memory>
 
 #include "parser.tab.h"
 #include "ast.h"
 #include "ekcc.h"
+
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 
 using namespace std;
 
@@ -104,6 +109,16 @@ int main(int argc, char* argv[]) {
         os << "---" << endl;
         the_prog->yaml(os, "");
         os << "..." << endl;
+    }
+
+    if (emit_llvm) {
+        context = make_unique<LLVMContext>();
+        module = make_unique<Module>("EKProgram", *context);
+        builder = make_unique<IRBuilder<> >(*context);
+
+        the_prog->code_gen();
+
+        module->print(errs(), nullptr);
     }
 
     delete the_prog;
