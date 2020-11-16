@@ -20,8 +20,8 @@
 using namespace std;
 using namespace llvm;
 
-// Table of all Value* s 
-static unordered_map<string, Value *> name_to_Value;    
+// Table of all (mutable) variable addresses
+static unordered_map<string, AllocaInst *> name_to_Value;
 
 // Classes for llvm code generation
 static unique_ptr<LLVMContext> context;
@@ -47,6 +47,13 @@ Value *LogErrorV(const string& str) {
     return nullptr;
 }
 
+AllocaInst *vdecl::code_gen() {
+    AllocaInst *alloc_var = builder->CreateAlloca(map_llvm_type(tp->kind), 
+                                        variable->identifier);
+    name_to_Value[variable->identifier] = alloc_var;
+    return alloc_var;
+}
+
 Value* lit::code_gen() {
     return ConstantInt::get(map_llvm_type(type::t_int), it);
 }
@@ -58,14 +65,26 @@ Value* flit::code_gen() {
 Value* varval::code_gen() {
     if (!name_to_Value.count(variable->identifier)) 
         return LogErrorV("Unknown variable name");
-    return name_to_Value[variable->identifier];
+    AllocaInst *alloc_v = name_to_Value[variable->identifier];
+    return builder->CreateLoad(alloc_v, variable->identifier);
+}
+
+Value *assign::code_gen() {
+    Value *exp_v = expression->code_gen();
+    if (!exp_v) return nullptr;
+    AllocaInst *alloc_v = name_to_Value[variable->variable->identifier];
+    if (!alloc_v) return LogErrorV("Unknown variable name");
+
+    builder->CreateStore(exp_v, alloc_v);
+    return exp_v;
 }
 
 Value* funccall::code_gen() {
     Function* called_func = module->getFunction(globid->identifier);
     if (!called_func) return LogErrorV("Unknown function referenced");
 
-    if (called_func->arg_size() != params->expressions.size()) return LogErrorV("Incorrect # of arguments");
+    if (called_func->arg_size() != params->expressions.size()) 
+        return LogErrorV("Incorrect # of arguments");
 
     vector<Value* > args;
     for (int i = 0; i < params->expressions.size(); i++) {
@@ -130,10 +149,11 @@ Value *ret::code_gen() {
 }
 
 Value *vdeclstmt::code_gen() {
+    AllocaInst *alloc_v = variable->code_gen();
     Value *exp_v = expression->code_gen();
-    if (!exp_v) return nullptr;
+    if (!exp_v || !alloc_v) return nullptr;
 
-    name_to_Value[variable->getName()] = exp_v;
+    builder->CreateStore(exp_v, alloc_v);
     return exp_v;
 }
 
@@ -208,13 +228,20 @@ Function *func::code_gen() {
 
     unsigned i = 0;
     for (auto &arg : f->args()) {
-        arg.setName(variable_declarations->variables[i]->getName());
-        name_to_Value[arg.getName()] = &arg;
+        arg.setName(variable_declarations->variables[i++]->getName());
     }
 
     // function body
     BasicBlock *bb = BasicBlock::Create(*context, "entry", f);
     builder->SetInsertPoint(bb);
+    // Setup function argument variables
+    name_to_Value.clear();
+    unsigned i = 0;
+    for (auto &arg : f->args()) {
+        AllocaInst *alloc_param = variable_declarations->variables[i++]->code_gen();
+        builder->CreateStore(&arg, alloc_param);
+    }
+
     block->code_gen();
     if (rt->kind == type::t_void)
         builder->CreateRetVoid();

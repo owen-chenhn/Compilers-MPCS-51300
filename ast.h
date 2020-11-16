@@ -7,6 +7,7 @@
 #include <cassert>
 
 #include "llvm/IR/Value.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module"
 
@@ -50,6 +51,7 @@ struct vdecl : public node {
     vdecl(type *t, id *var);
     string getName() { return variable->identifier; }
     type::type_kind getTypeKind() { return tp->kind; }
+    AllocaInst *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -143,6 +145,7 @@ struct assign : public exp {
 
     assign(varval *v, exp *e): exp(v->exp_type), variable(v), expression(e) {}
     void check_type();
+    Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
