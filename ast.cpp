@@ -117,6 +117,10 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
+funccall::funccall(id* gid, exps *p) : exp(nullptr), globid(gid), params(p) {
+    if (!p) params = new exps();
+}
+
 void funccall::check_type() {
     if (params) {
         for (exp *expr : params->expressions) expr->check_type(); 
