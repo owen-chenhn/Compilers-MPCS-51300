@@ -49,7 +49,7 @@ Value *LogErrorV(const string& str) {
 
 AllocaInst *vdecl::code_gen() {
     AllocaInst *alloc_var = builder->CreateAlloca(map_llvm_type(tp->kind), 
-                                        variable->identifier);
+                                    nullptr, variable->identifier);
     name_to_Value[variable->identifier] = alloc_var;
     return alloc_var;
 }
