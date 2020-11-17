@@ -1,4 +1,4 @@
-CXXFLAG = -Wall -Wextra -pedantic -std=c++11 -g 
+CXXFLAG = -Wall -Wextra -pedantic -std=c++11
 LLVMFLAG = `llvm-config --ldflags --system-libs --libs core`
 
 all: ekcc lib
@@ -25,7 +25,7 @@ main: ekcc.cpp ekcc.h ast.h parser
 	$(CXX) $(CXXFLAG) -c -o bin/main.o ekcc.cpp $(LLVMFLAG)
 
 lib: lib-llvm.cpp
-    $(CXX) $(CXXFLAG) -c -o lib.o lib-llvm.cpp
+	$(CXX) $(CXXFLAG) -c -o lib.o lib-llvm.cpp
 
 
 clean: 
