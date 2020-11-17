@@ -21,3 +21,13 @@ Bonus:
 2. Checked variable usage before declaration.
 3. Checked whether passed in function parameters match function signature. 
 4. Checked whether the return type of a function indeed matches the type of all the return statements in its function body.  
+
+
+For assignment 3, 
+
+The current program can make and generate ./bin/ekcc, using CS Linux Machine's default LLVM version of 3.8 
+at /usr/lib/llvm-3.8/. 
+
+We had some problems linking to customed LLVM path when running the Makefile. 
+
+Currently if we run run ./bin/ekcc -emit-llvm -o <output_file> <input_file>, the program will print corresponding LLVM IR to stdout. 
