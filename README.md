@@ -25,9 +25,12 @@ Bonus:
 
 For assignment 3, 
 
-The current program can make and generate ./bin/ekcc, using CS Linux Machine's default LLVM version of 3.8 
-at /usr/lib/llvm-3.8/. 
+We assume llvm-config and clang version of 7.0 in the environment for successful make. 
 
-We had some problems linking to customed LLVM path when running the Makefile. 
+After make, you can run ./bin/ekcc -emit-llvm -o <output_file> <input_file> 
+and get the IR(somewhat a .ll) <output_file>. 
 
-Currently if we run run ./bin/ekcc -emit-llvm -o <output_file> <input_file>, the program will print corresponding LLVM IR to stdout. 
+Or run ./bin/ekcc -o <output_file> <input_file> and get the <output_file> executable.
+
+
+We currently still have some issues linking the print and getarg functions in customed library. The program can still run, starting from run() though. 
