@@ -4,16 +4,19 @@
 
 using namespace std;
 
-void printStr(char *str) {
+int printStr(char *str) {
     cout << str << endl;
+    return 0;
 }
 
-void printInt(int i) {
+int printInt(int i) {
     cout << i << endl;
+    return 0;
 }
 
-void printFloat(float f) {
+int printFloat(float f) {
     cout << f << endl;
+    return 0;
 }
 
 

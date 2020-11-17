@@ -349,18 +349,18 @@ Function *ext::code_gen() {
 static void declare_print_functions() {
     // declare printStr
     vector<Type *> args = { Type::getInt8PtrTy(*context) };
-    FunctionType *ft = FunctionType::get(Type::getVoidTy(*context), args, false);
+    FunctionType *ft = FunctionType::get(Type::getInt32Ty(*context), args, false);
     module->getOrInsertFunction("printStr", ft);
 
     // declare printInt
     args.clear();
     args.push_back(Type::getInt32Ty(*context));
-    module->getOrInsertFunction("printInt", FunctionType::get(Type::getVoidTy(*context), args, false));
+    module->getOrInsertFunction("printInt", FunctionType::get(Type::getInt32Ty(*context), args, false));
 
     // declare printFloat
     args.clear();
     args.push_back(Type::getFloatTy(*context));
-    module->getOrInsertFunction("printFloat", FunctionType::get(Type::getVoidTy(*context), args, false));
+    module->getOrInsertFunction("printFloat", FunctionType::get(Type::getInt32Ty(*context), args, false));
 }
 
 Module *prog::code_gen() {
