@@ -135,6 +135,7 @@ struct varval : public expr {
     virtual void yaml(ostream &os, string prefix);
 
     Value* code_gen();
+    AllocaInst* get_var_pointer();
 
     ~varval() { delete variable; }
 };

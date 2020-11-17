@@ -31,16 +31,23 @@ unique_ptr<IRBuilder<> > builder = make_unique<IRBuilder<> >(*context);
 unique_ptr<Module> module = make_unique<Module>("EKProgram", *context);
 
 // Helper function: map class type to llvm Type*
-Type *map_llvm_type(type::type_kind t) {
-    Type *type_ptr;
+Type *map_llvm_type(type::type_kind t, bool ref) {
     switch (t) {
-        case type::t_void  : type_ptr = Type::getVoidTy(*context);  break;
-        case type::t_bool  : type_ptr = Type::getInt1Ty(*context);  break;
-        case type::t_int   : type_ptr = Type::getInt32Ty(*context); break;
-        case type::t_cint  : type_ptr = Type::getInt32Ty(*context); break;
-        case type::t_float : type_ptr = Type::getFloatTy(*context); break;
+    case type::t_bool: 
+        if (ref) return Type::getInt1PtrTy(*context);
+        else return Type::getInt1Ty(*context);
+
+    case type::t_cint:
+    case type::t_int:
+        if (ref) return Type::getInt32PtrTy(*context);
+        else return Type::getInt32Ty(*context);
+
+    case type::t_float:
+        if (ref) return Type::getFloatPtrTy(*context);
+        else return Type::getFloatTy(*context);
+
+    default: return Type::getVoidTy(*context);
     };
-    return type_ptr;
 }
 
 // method to print code gen log error and return Value * 
@@ -55,33 +62,47 @@ Function *LogErrorF(const string& str) {
     return nullptr;
 }
 
+// Helper function to dereference a pointer value
+Value* expr_deref(Value *expression) {
+    if (expression && expression->getType()->isPointerTy()) {
+        return builder->CreateLoad(expression, "deref");
+    }
+    return expression;
+}
+
 AllocaInst *vdecl::code_gen() {
-    AllocaInst *alloc_var = builder->CreateAlloca(map_llvm_type(tp->kind), 
+    AllocaInst *alloc_var = builder->CreateAlloca(map_llvm_type(tp->kind, tp->ref), 
                                     nullptr, variable->identifier);
     name_to_Value[variable->identifier] = alloc_var;
     return alloc_var;
 }
 
 Value* lit::code_gen() {
-    return ConstantInt::get(map_llvm_type(type::t_int), it);
+    return ConstantInt::get(map_llvm_type(type::t_int, false), it);
 }
 
 Value* flit::code_gen() {
-    return ConstantFP::get(map_llvm_type(type::t_float), flt);
+    return ConstantFP::get(map_llvm_type(type::t_float, false), flt);
+}
+
+AllocaInst* varval::get_var_pointer() {
+    return name_to_Value[variable->identifier];
 }
 
 Value* varval::code_gen() {
-    if (!name_to_Value.count(variable->identifier)) 
+    AllocaInst *alloc_v = get_var_pointer();
+    if (!alloc_v) 
         return LogErrorV("Unknown variable name");
-    AllocaInst *alloc_v = name_to_Value[variable->identifier];
     return builder->CreateLoad(alloc_v, variable->identifier);
 }
 
 Value *assign::code_gen() {
-    Value *exp_v = expression->code_gen();
+    Value *exp_v = expr_deref(expression->code_gen());
     if (!exp_v) return nullptr;
-    AllocaInst *alloc_v = name_to_Value[variable->variable->identifier];
+    Value *alloc_v = name_to_Value[variable->variable->identifier];
     if (!alloc_v) return LogErrorV("Unknown variable name");
+    if (variable->exp_type->ref) 
+        alloc_v = builder->CreateLoad(alloc_v, "deref");
 
     builder->CreateStore(exp_v, alloc_v);
     return exp_v;
@@ -91,27 +112,32 @@ Value* funccall::code_gen() {
     Function* called_func = module->getFunction(globid->identifier);
     if (!called_func) return LogErrorV("Unknown function referenced");
 
-    if (called_func->arg_size() != params->expressions.size()) 
+    if (called_func->arg_size() != params->expressions.size())
         return LogErrorV("Incorrect # of arguments");
 
     vector<Value* > args;
-    for (int i = 0; i < params->expressions.size(); i++) {
-        args.push_back(params->expressions[i]->code_gen());
+    unsigned i = 0;
+    for (auto &Arg : called_func->args()) {
+        expr *expression = params->expressions[i++];
+        Value *arg_v = Arg.getType()->isPointerTy() ? 
+                        ((varval *)expression)->get_var_pointer() : 
+                        expr_deref(expression->code_gen());
+        args.push_back(arg_v);
     }
 
     return builder->CreateCall(called_func, args, "calltmp");
 }
 
 Value* uop::code_gen() {
-    if (kind == uop_not) return builder->CreateNot(expression->code_gen(), "nottmp");
+    if (kind == uop_not) return builder->CreateNot(expr_deref(expression->code_gen()), "nottmp");
     return expression->exp_type->kind == type::t_float ? 
-           builder->CreateFNeg(expression->code_gen(), "negfptmp") : 
-           builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
+           builder->CreateFNeg(expr_deref(expression->code_gen()), "negfptmp") : 
+           builder->CreateNeg(expr_deref(expression->code_gen()), "negtmp", true, true);
 }
 
 Value* binop::code_gen() {
-    Value* L = lhs->code_gen();
-    Value* R = rhs->code_gen();
+    Value* L = expr_deref(lhs->code_gen());
+    Value* R = expr_deref(rhs->code_gen());
 
     switch (kind) {
         case bop_mul : 
@@ -149,12 +175,12 @@ Value* binop::code_gen() {
 
 // assuming type check has already been performed 
 Value* castexp::code_gen() {
-    Value* e = expression->code_gen();
+    Value* e = expr_deref(expression->code_gen());
     switch(tp->kind) {
         case type::t_int :
-            return builder->CreateIntCast(e, map_llvm_type(type::t_int), false, "castinttmp");
+            return builder->CreateIntCast(e, map_llvm_type(type::t_int, false), false, "castinttmp");
         case type::t_float:
-            return builder->CreateFPCast(e, map_llvm_type(type::t_float), "castfloattmp");
+            return builder->CreateFPCast(e, map_llvm_type(type::t_float, false), "castfloattmp");
         case type::t_bool:
             return e;
     }
@@ -162,7 +188,7 @@ Value* castexp::code_gen() {
 
 Value *ret::code_gen() {
     if (expression) {
-        Value *exp_v = expression->code_gen();
+        Value *exp_v = expr_deref(expression->code_gen());
         if (!exp_v) return nullptr;
         return builder->CreateRet(exp_v);
     }
@@ -172,7 +198,15 @@ Value *ret::code_gen() {
 
 Value *vdeclstmt::code_gen() {
     AllocaInst *alloc_v = variable->code_gen();
-    Value *exp_v = expression->code_gen();
+    Value *exp_v;
+    if (variable->tp->ref && !expression->exp_type->ref) {
+        exp_v = ((varval *)expression)->get_var_pointer();
+    }
+    else {
+        exp_v = expression->code_gen();
+        if (!variable->tp->ref && expression->exp_type->ref) 
+            exp_v = expr_deref(exp_v);
+    }
     if (!exp_v || !alloc_v) return nullptr;
 
     builder->CreateStore(exp_v, alloc_v);
@@ -187,7 +221,7 @@ Value *whilestmt::code_gen() {
     
     builder->CreateBr(head_bb);
     builder->SetInsertPoint(head_bb);
-    Value *cond_v = condition->code_gen();
+    Value *cond_v = expr_deref(condition->code_gen());
     if (!cond_v) return nullptr;
     builder->CreateCondBr(cond_v, body_bb, exit_bb);
 
@@ -204,7 +238,7 @@ Value *whilestmt::code_gen() {
 }
 
 Value *ifstmt::code_gen() {
-    Value *cond_v = condition->code_gen();
+    Value *cond_v = expr_deref(condition->code_gen());
     if (!cond_v) return nullptr;
 
     Function *the_func = builder->GetInsertBlock()->getParent();
@@ -217,14 +251,12 @@ Value *ifstmt::code_gen() {
     builder->SetInsertPoint(then_bb);
     Value *then_v = statement->code_gen();
     builder->CreateBr(merge_bb);
-    then_bb = builder->GetInsertBlock();
 
     // insert else's code
     the_func->getBasicBlockList().push_back(else_bb);
     builder->SetInsertPoint(else_bb);
     if (else_statement) else_statement->code_gen();
     builder->CreateBr(merge_bb);
-    else_bb = builder->GetInsertBlock();
 
     // merge block
     the_func->getBasicBlockList().push_back(merge_bb);
@@ -233,7 +265,7 @@ Value *ifstmt::code_gen() {
 }
 
 Value *print::code_gen() {
-    Value *exp_v = expression->code_gen();
+    Value *exp_v = expr_deref(expression->code_gen());
     vector<Value *> args = { exp_v };
     string func_name = (expression->exp_type->kind == type::t_float) ? 
                         "printFloat" : 
@@ -260,11 +292,11 @@ Function *func::code_gen() {
     unsigned params = variable_declarations ? variable_declarations->variables.size() : 0;
     vector<Type *> param_types;
     for (unsigned i = 0; i < params; i++) {
-        type::type_kind tkind = variable_declarations->variables[i]->getTypeKind();
-        param_types.push_back(map_llvm_type(tkind));
+        type *tp = variable_declarations->variables[i]->tp;
+        param_types.push_back(map_llvm_type(tp->kind, tp->ref));
     }
 
-    Type *ret_type = map_llvm_type(rt->kind);
+    Type *ret_type = map_llvm_type(rt->kind, false);
     FunctionType *ft = FunctionType::get(ret_type, param_types, false);
     Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
 
@@ -298,11 +330,11 @@ Function *ext::code_gen() {
     unsigned params = type_declarations ? type_declarations->types.size() : 0;
     vector<Type *> param_types;
     for (unsigned i = 0; i < params; i++) {
-        type::type_kind tkind = type_declarations->types[i]->kind;
-        param_types.push_back(map_llvm_type(tkind));
+        type *tp = type_declarations->types[i];
+        param_types.push_back(map_llvm_type(tp->kind, tp->ref));
     }
 
-    Type *ret_type = map_llvm_type(rt->kind);
+    Type *ret_type = map_llvm_type(rt->kind, false);
     FunctionType *ft = FunctionType::get(ret_type, param_types, false);
     Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
 
