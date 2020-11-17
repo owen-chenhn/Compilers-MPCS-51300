@@ -30,4 +30,4 @@ lib: lib-llvm.cpp
 
 
 clean: 
-	rm -rf bin/* lexer.c parser.tab.* *.yaml *.o
+	rm -rf bin/* lexer.c parser.tab.* *.yaml *.o *.ll 

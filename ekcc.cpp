@@ -140,15 +140,15 @@ int main(int argc, char* argv[]) {
         if (emit_llvm) { // no exe output 
             if (verbose) cout << "Emit LLVM IR code to output file: " << output << endl;
             raw_fd_ostream emit_OS(output, EC);
-            the_module->print(OS, nullptr);
-            OS.flush();
+            the_module->print(emit_OS, nullptr);
+            emit_OS.flush();
             if (verbose) cout << "Finished emitting LLVM IR code.\n";
         } else { // generate exe 
             string command = "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o " + output;
             std::system(command.c_str());
-            std::system("rm intermediate.ll");
-               }
         }
+        }
+        std::system("rm intermediate.ll intermediate.");
     delete the_prog;
     return 0;
 }
