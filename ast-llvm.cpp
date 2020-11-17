@@ -234,7 +234,7 @@ Value *whilestmt::code_gen() {
     // loop exit
     the_func->getBasicBlockList().push_back(exit_bb);
     builder->SetInsertPoint(exit_bb);
-    return Constant::getNullValue(Type::getVoidTy(*context));
+    return Constant::getNullValue(Type::getInt32Ty(*context));
 }
 
 Value *ifstmt::code_gen() {
@@ -250,18 +250,21 @@ Value *ifstmt::code_gen() {
     // insert then's code
     builder->SetInsertPoint(then_bb);
     Value *then_v = statement->code_gen();
+    if (!then_v) return nullptr;
     builder->CreateBr(merge_bb);
 
     // insert else's code
     the_func->getBasicBlockList().push_back(else_bb);
     builder->SetInsertPoint(else_bb);
-    if (else_statement) else_statement->code_gen();
+    if (else_statement) {
+        if (!else_statement->code_gen()) return nullptr;
+    }
     builder->CreateBr(merge_bb);
 
     // merge block
     the_func->getBasicBlockList().push_back(merge_bb);
     builder->SetInsertPoint(merge_bb);
-    return Constant::getNullValue(Type::getVoidTy(*context));
+    return Constant::getNullValue(Type::getInt32Ty(*context));
 }
 
 Value *print::code_gen() {
