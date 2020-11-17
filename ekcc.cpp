@@ -4,6 +4,8 @@
 #include <getopt.h> 
 #include <fstream>
 #include <memory>
+#include <system_error>
+#include <cstdlib>
 
 #include "parser.tab.h"
 #include "ast.h"
@@ -11,8 +13,10 @@
 
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 
 using namespace std;
+using namespace llvm;
 
 /* Print helper messages. */
 void Header() {
@@ -124,19 +128,27 @@ int main(int argc, char* argv[]) {
         the_prog->yaml(os, "");
         os << "..." << endl;
         if (verbose) cout << "Finished emitting AST.\n";
-    }
+    } else { // need to codegen 
+        if (verbose) cout << "Start generating LLVM IR code.\n";
+        Module *the_module = the_prog->code_gen();
+        error_code EC;
+        raw_fd_ostream OS("intermediate.ll", EC);
+        the_module->print(OS, nullptr);
+        OS.flush();
+        if (verbose) cout << "Finished generating LLVM IR code.\n";
 
-    if (verbose) cout << "Start generating LLVM IR code.\n";
-    llvm::Module *the_module = the_prog->code_gen();
-    the_module->print(errs(), nullptr);
-    if (verbose) cout << "Finished generating LLVM IR code.\n";
-
-    if (emit_llvm) {
-        if (verbose) cout << "Emit LLVM IR code to output file: " << output << endl;
-        
-        if (verbose) cout << "Finished emitting LLVM IR code.\n";
-    }
-
+        if (emit_llvm) { // no exe output 
+            if (verbose) cout << "Emit LLVM IR code to output file: " << output << endl;
+            raw_fd_ostream emit_OS(output, EC);
+            the_module->print(OS, nullptr);
+            OS.flush();
+            if (verbose) cout << "Finished emitting LLVM IR code.\n";
+        } else { // generate exe 
+            string command = "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o " + output;
+            std::system(command.c_str());
+            std::system("rm intermediate.ll");
+               }
+        }
     delete the_prog;
     return 0;
 }

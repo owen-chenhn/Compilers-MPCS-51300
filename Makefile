@@ -1,5 +1,6 @@
 CXXFLAG = -Wall -Wextra -pedantic -std=c++11
-LLVMFLAG = `llvm-config --ldflags --system-libs --libs core`
+LLVMFLAG = `llvm-config --cxxflags --ldflags --system-libs --libs core`
+CXX=clang++
 
 all: ekcc lib
 
@@ -9,7 +10,7 @@ ekcc: parser lexer ast ast-llvm main
 
 parser: parser.y ast.h
 	bison -d parser.y		# bison -L c++ -o parser.cpp -d parser.y
-	$(CXX) $(CXXFLAG) -c -o bin/parser.o parser.tab.c
+	$(CXX) $(CXXFLAG) -c -o bin/parser.o parser.tab.c $(LLVMFLAG)
 
 lexer: lexer.l parser
 	flex -olexer.c lexer.l		# flex -+ -o lexer.cpp lexer.l
