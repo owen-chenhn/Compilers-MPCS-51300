@@ -21,12 +21,13 @@ void Header() {
 }
 
 void Usage() {
-    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm] -o <output-file> <input-file>\n" << 
+    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm|-jit] -o <output-file> <input-file>\n" << 
             "\t" << "-h|-?: Print helper message.\n" << 
             "\t" << "-v: Enable verbose mode.\n" << 
             "\t" << "-O: Enable optimization.\n" << 
             "\t" << "-emit-ast: Produce the AST of the input program to the output file.\n" << 
             "\t" << "-emit-llvm: Produce the LLVM IR of the input program to the output file.\n" << 
+            "\t" << "-jit: Produce the executable of the input program as the output file.\n" <<
             "\t" << "-o <output-file>: Path to the output file.\n" << 
             "\t" << "<input-file>: Path to the input ek program.\n";
 }
@@ -37,7 +38,7 @@ int main(int argc, char* argv[]) {
     extern FILE *yyin;
     extern prog *the_prog;
 
-    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false;
+    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false, jit = false;
     string output = "";
 
     // Command-line options parsing
@@ -45,6 +46,7 @@ int main(int argc, char* argv[]) {
     const struct option longopts[] = {
         {"emit-ast", no_argument, nullptr, 'a'}, 
         {"emit-llvm", no_argument, nullptr, 'l'},
+        {"jit", no_argument, nullptr, 'j'},
         {0, 0, 0, 0}
     };
     int optret;
@@ -71,11 +73,14 @@ int main(int argc, char* argv[]) {
         case 'l' :
             emit_llvm = true;
             break;
+        case 'j' :
+            jit = true;
+            break; 
         }
     }
     
-    if (emit_ast && emit_llvm) {
-        cout << "error: flag -emit-ast and flag -emit-llvm cannot be set simultaneously.\n";
+    if (emit_ast && emit_llvm || emit_ast && jit || emit_llvm && jit) {
+        cout << "error: At most one of the flags -emit-ast / -emit-llvm / -jit can be set.\n";
         exit(-1);
     }
     if (output.size() == 0) {
