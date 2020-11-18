@@ -4,22 +4,6 @@
 
 using namespace std;
 
-int printStr(char *str) {
-    cout << str << endl;
-    return 0;
-}
-
-int printInt(int i) {
-    cout << i << endl;
-    return 0;
-}
-
-int printFloat(float f) {
-    cout << f << endl;
-    return 0;
-}
-
-
 /* Variables that store argument information. */
 static int argcount;
 static char **argstrings;

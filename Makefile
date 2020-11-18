@@ -1,4 +1,4 @@
-CXXFLAG = -Wall -Wextra -pedantic -std=c++11
+CXXFLAG = -std=c++11 #-Wall -Wextra -pedantic 
 LLVMFLAG = `llvm-config --cxxflags --ldflags --system-libs --libs core`
 CXX=clang++
 
