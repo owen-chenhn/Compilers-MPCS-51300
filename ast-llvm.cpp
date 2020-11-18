@@ -125,6 +125,8 @@ Value* funccall::code_gen() {
         args.push_back(arg_v);
     }
 
+    if (called_func->getReturnType()->isVoidTy()) 
+        return builder->CreateCall(called_func, args);
     return builder->CreateCall(called_func, args, "calltmp");
 }
 
@@ -283,7 +285,7 @@ Value *print::code_gen() {
 
 Value *printslit::code_gen() {
     // generate code for string
-    Value *str_v = builder->CreateGlobalStringPtr(StringRef(str));
+    Value *str_v = builder->CreateGlobalStringPtr(StringRef(str+'\n'));
 
     Function* printFunc = module->getFunction("printf");
     if (!printFunc) return LogErrorV("Function printf undeclared");
