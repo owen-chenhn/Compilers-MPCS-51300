@@ -285,7 +285,7 @@ Value *print::code_gen() {
 
 Value *printslit::code_gen() {
     // generate code for string
-    Value *str_v = builder->CreateGlobalStringPtr(StringRef(str+'\n'));
+    Value *str_v = builder->CreateGlobalStringPtr(StringRef(str + '\n'));
 
     Function* printFunc = module->getFunction("printf");
     if (!printFunc) return LogErrorV("Function printf undeclared");

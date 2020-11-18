@@ -377,7 +377,7 @@ struct print : public stmt {
 struct printslit : public stmt {
     string str;
 
-    printslit(string s) : str(s) {}
+    printslit(string s) : str(s.substr(1,s.size() - 2)) {}
     Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
