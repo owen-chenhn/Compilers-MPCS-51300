@@ -147,8 +147,9 @@ int main(int argc, char* argv[]) {
             string command = "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o " + output;
             std::system(command.c_str());
         }
+        std::system("rm intermediate.ll");
         }
-        std::system("rm intermediate.ll intermediate.");
+
     delete the_prog;
     return 0;
 }
