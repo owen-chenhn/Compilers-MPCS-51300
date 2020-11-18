@@ -269,26 +269,27 @@ Value *ifstmt::code_gen() {
 
 Value *print::code_gen() {
     Value *exp_v = expr_deref(expression->code_gen());
-    vector<Value *> args = { exp_v };
-    string func_name = (expression->exp_type->kind == type::t_float) ? 
-                        "printFloat" : 
-                        "printInt";
+    string format_str = (expression->exp_type->kind == type::t_float) ?
+                        "%f\n" : 
+                        "%d\n";
+    Value *str_v = builder->CreateGlobalStringPtr(StringRef(format_str));
 
-    Function* printFunc = module->getFunction(func_name);
-    if (!printFunc) return LogErrorV("Function " + func_name + " undeclared");
+    vector<Value *> args = { str_v, exp_v };
+    Function* printFunc = module->getFunction("printf");
+    if (!printFunc) return LogErrorV("Function printf undeclared");
 
-    return builder->CreateCall(printFunc, args, "callprint");
+    return builder->CreateCall(printFunc, args, "callprintf");
 }
 
 Value *printslit::code_gen() {
     // generate code for string
     Value *str_v = builder->CreateGlobalStringPtr(StringRef(str));
 
-    Function* printFunc = module->getFunction("printStr");
-    if (!printFunc) return LogErrorV("Function printStr undeclared");
+    Function* printFunc = module->getFunction("printf");
+    if (!printFunc) return LogErrorV("Function printf undeclared");
 
     vector<Value *> args = { str_v };
-    return builder->CreateCall(printFunc, args, "callprintStr");
+    return builder->CreateCall(printFunc, args, "callprintf");
 }
 
 Function *func::code_gen() {
@@ -346,21 +347,11 @@ Function *ext::code_gen() {
 
 
 /* Helper functions to declare library print functions. */
-static void declare_print_functions() {
+static void declare_printf() {
     // declare printStr
-    vector<Type *> args = { Type::getInt8PtrTy(*context) };
-    FunctionType *ft = FunctionType::get(Type::getInt32Ty(*context), args, false);
-    module->getOrInsertFunction("printStr", ft);
-
-    // declare printInt
-    args.clear();
-    args.push_back(Type::getInt32Ty(*context));
-    module->getOrInsertFunction("printInt", FunctionType::get(Type::getInt32Ty(*context), args, false));
-
-    // declare printFloat
-    args.clear();
-    args.push_back(Type::getFloatTy(*context));
-    module->getOrInsertFunction("printFloat", FunctionType::get(Type::getInt32Ty(*context), args, false));
+    FunctionType *ft = FunctionType::get(Type::getInt32Ty(*context), 
+                        Type::getInt8PtrTy(*context), true);
+    module->getOrInsertFunction("printf", ft);
 }
 
 Module *prog::code_gen() {
@@ -369,7 +360,7 @@ Module *prog::code_gen() {
             e->code_gen();
     }
 
-    declare_print_functions();
+    declare_printf();
 
     for (func *f : functions->functions) 
         f->code_gen();
