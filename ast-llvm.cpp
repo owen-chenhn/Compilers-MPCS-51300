@@ -270,11 +270,13 @@ Value *ifstmt::code_gen() {
 }
 
 Value *print::code_gen() {
-    Value *exp_v = expr_deref(expression->code_gen());
-    string format_str = (expression->exp_type->kind == type::t_float) ?
-                        "%f\n" : 
-                        "%d\n";
+    bool float_flag = expression->exp_type->kind == type::t_float;
+    string format_str = float_flag ? "%f\n" : "%d\n";
     Value *str_v = builder->CreateGlobalStringPtr(StringRef(format_str));
+
+    Value *exp_v = expr_deref(expression->code_gen());
+    if (float_flag) 
+        exp_v = builder->CreateFPExt(exp_v, Type::getDoubleTy(*context), "fpext");
 
     vector<Value *> args = { str_v, exp_v };
     Function* printFunc = module->getFunction("printf");
