@@ -33,4 +33,4 @@ and get the IR(somewhat a .ll) <output_file>.
 Or run ./bin/ekcc -o <output_file> <input_file> and get the <output_file> executable.
 
 
-We currently still have some issues linking the print and getarg functions in customed library. The program can still run, starting from run() though. 
+We currently still have some issues linking the getarg functions in customed library. The program can still run, starting from run(), and print. 
