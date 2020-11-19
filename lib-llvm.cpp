@@ -8,6 +8,12 @@ using namespace std;
 static int argcount;
 static char **argstrings;
 
+extern "C" {
+    void run();
+    int getarg(int i);
+    float getargf(int i);
+}
+
 int getarg(int i) {
     if (i < 0 || i >= argcount) {
         cout << "Error: getarg()'s index out of bound.\n";
@@ -26,7 +32,6 @@ float getargf(int i) {
     return atof(argstrings[i]);
 }
 
-extern "C" void run();
 
 int main(int argc,char *argv[]) {
     argcount = argc - 1;

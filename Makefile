@@ -27,7 +27,9 @@ main: ekcc.cpp ekcc.h ast.h parser
 
 lib: lib-llvm.cpp
 	$(CXX) $(CXXFLAG) -c -o lib.o lib-llvm.cpp
+	#ar -crv libllvm.a lib.o
+	#$(CXX) $(CXXFLAG) lib.o -shared -fPIC -o libllvm.so
 
 
 clean: 
-	rm -rf bin/* lexer.c parser.tab.* *.yaml *.o *.ll 
+	rm -rf bin/* lexer.c parser.tab.* *.o *.ll *.a *.yaml *.out
