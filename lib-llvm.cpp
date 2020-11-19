@@ -10,22 +10,22 @@ static char **argstrings;
 
 extern "C" {
     void run();
-    int getarg(int i);
-    float getargf(int i);
+    int arg(int i);
+    float argf(int i);
 }
 
-int getarg(int i) {
+int arg(int i) {
     if (i < 0 || i >= argcount) {
-        cout << "Error: getarg()'s index out of bound.\n";
+        cout << "Error: arg()'s index out of bound.\n";
         exit(-1);
     }
 
     return atoi(argstrings[i]);
 }
 
-float getargf(int i) {
+float argf(int i) {
     if (i < 0 || i >= argcount) {
-        cout << "Error: getargf()'s index out of bound.\n";
+        cout << "Error: argf()'s index out of bound.\n";
         exit(-1);
     }
 
