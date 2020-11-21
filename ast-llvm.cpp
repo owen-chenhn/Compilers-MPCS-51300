@@ -24,6 +24,7 @@ using namespace llvm;
 
 // Table of all (mutable) variable addresses
 static unordered_map<string, AllocaInst *> name_to_Value;
+static Constant *printf_int_fmt = nullptr, *printf_float_fmt = nullptr;
 
 // Classes for llvm code generation
 unique_ptr<LLVMContext> context = make_unique<LLVMContext>();
@@ -329,8 +330,7 @@ Function *func::code_gen() {
         builder->CreateRetVoid();
     
     // verify the generated code
-    if (verifyFunction(*f))
-        return LogErrorF("Verification of code generation failed.");
+    verifyFunction(*f, &llvm::errs());
     return f;
 }
 
@@ -369,5 +369,6 @@ Module *prog::code_gen() {
     for (func *f : functions->functions) 
         f->code_gen();
 
+    verifyModule(*module, &llvm::errs());
     return module.get();
 }
