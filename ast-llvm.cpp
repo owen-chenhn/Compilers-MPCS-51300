@@ -148,7 +148,9 @@ Value* binop::code_gen() {
                    builder->CreateFMul(L, R, "mulfptmp") : 
                    builder->CreateMul(L, R, "multmp", true, true);
         case bop_div : 
-            return builder->CreateFDiv(L, R, "divfptmp");
+            return lhs->exp_type->kind == type::t_float ? 
+                   builder->CreateFDiv(L, R, "divfptmp") : 
+                   builder->CreateSDiv(L, R, "sdivtmp");
         case bop_add : 
             return lhs->exp_type->kind == type::t_float ?
                    builder->CreateFAdd(L, R, "addfptmp") : 
