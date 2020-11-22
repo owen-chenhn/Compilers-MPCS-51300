@@ -21,3 +21,16 @@ Bonus:
 2. Checked variable usage before declaration.
 3. Checked whether passed in function parameters match function signature. 
 4. Checked whether the return type of a function indeed matches the type of all the return statements in its function body.  
+
+
+For assignment 3, 
+
+We assume llvm-config and clang version of 7.0 in the environment for successful make. 
+
+After make, you can run ./bin/ekcc -emit-llvm -o <output_file> <input_file> 
+and get the IR(somewhat a .ll) <output_file>. 
+
+Or run ./bin/ekcc -o <output_file> <input_file> and get the <output_file> executable.
+
+
+We currently still have some issues linking the getarg functions in customed library. The program can still run, starting from run(), and print. 

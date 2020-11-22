@@ -2,9 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
-#include <unordered_set>
 #include <iostream>
-#include <type_traits>
 
 using namespace std;
 
@@ -12,15 +10,31 @@ static unordered_map<string, func *> function_table;    // Table of all the decl
 static unordered_map<string, ext *> extern_table;       // Table of all the external functions. make
 static unordered_map<string, vdecl *> vdecl_table;      // Table of all declared variables. 
 
+static void error(const string& err_msg) {
+    cout << "error: " << err_msg << endl;
+    exit(1);
+}
+
+string type::name() {
+    string nm;
+    if (noalias) nm += "noalias ";
+    if (ref) nm += "ref ";
+
+    switch (kind) {
+        case t_void : nm += "void" ;break; 
+        case t_bool : nm += "bool" ;break;   
+        case t_int  : nm += "int"  ;break;
+        case t_cint : nm += "cint" ;break; 
+        case t_float: nm += "float";break;
+    }
+
+    return nm;
+}
+
 void type::check_and_make_ref() {
     if (ref) error("Ref type may not refer to a reference.");
     if (kind == type::t_void) error("Ref type may not refer to void type.");
     ref = true;
-}
-
-void type::error(const string& err_msg) {
-    cout << "error: " << err_msg << endl;
-    exit(1);
 }
 
 vdecl::vdecl(type *t, id *var): tp(t), variable(var) {
@@ -73,7 +87,7 @@ void flit::yaml(ostream &os, string prefix) {
         os << prefix << "value: " << flt << endl;
 }
 
-varval::varval(id *v) : exp(nullptr), variable(v) {
+varval::varval(id *v) : expr(nullptr), variable(v) {
     if (!vdecl_table.count(v->identifier)) error("Variable " + v->identifier + " undeclared.");
     exp_type = vdecl_table[v->identifier]->tp;
 }
@@ -103,9 +117,13 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
+funccall::funccall(id* gid, exps *p) : expr(nullptr), globid(gid), params(p) {
+    if (!p) params = new exps();
+}
+
 void funccall::check_type() {
     if (params) {
-        for (exp *expr : params->expressions) expr->check_type(); 
+        for (expr *e : params->expressions) e->check_type(); 
     }
     
     bool flag;
@@ -130,8 +148,8 @@ void funccall::check_type() {
                 to_string(num_params) + ".");
     }
     for (unsigned i = 0; i < num_decls; i++) {
-        exp *expr = params->expressions[i];
-        type *exp_tp  = expr->exp_type, 
+        expr *ex = params->expressions[i];
+        type *exp_tp  = ex->exp_type, 
              *decl_tp = flag ? f->variable_declarations->variables[i]->tp 
                              : e->type_declarations->types[i];
         if (exp_tp->kind != decl_tp->kind) {
@@ -139,7 +157,7 @@ void funccall::check_type() {
                   "' got wrong argument type. Argument " + to_string(i+1) + 
                   " should be " + decl_tp->name() + " but got " + exp_tp->name());
         }
-        if (decl_tp->ref && !expr->is_variable()) {
+        if (decl_tp->ref && !ex->is_variable()) {
             error("Function '" + globid->identifier + 
                   "' expects variable (lvalue) for its reference argument " + 
                   to_string(i+1) + ".");
@@ -209,6 +227,25 @@ void binop::yaml(ostream &os, string prefix) {
         rhs->yaml(os, prefix + "  ");
 }
 
+void castexp::check_type() {
+    expression->check_type();
+    switch(expression->exp_type->kind) {
+        case type::t_int : 
+        case type::t_cint :
+        case type::t_float :
+            if (tp->kind == type::t_bool || tp->kind == type::t_void ) 
+                error(expression->exp_type->name() + 
+                " cannot be casted to " + 
+                expression->exp_type->name());
+            break;
+        case type::t_bool :
+            if (tp->kind != type::t_bool) error("Bool should be cast to only bool");
+            break;
+        default: 
+            error("Cannot cast void type.");
+    };
+}
+
 void castexp::yaml(ostream &os, string prefix) {
         os << prefix << "name: caststmt" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
@@ -240,7 +277,7 @@ void ret::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-vdeclstmt::vdeclstmt(vdecl *v, exp *e) : variable(v), expression(e) {
+vdeclstmt::vdeclstmt(vdecl *v, expr *e) : variable(v), expression(e) {
     if (v->tp->ref && !e->is_variable()) {
         //if (!is_same<varval, decltype(*e)>::value) 
         error("Ref variable initilization expression must be a variable.");
@@ -384,7 +421,7 @@ void exts::yaml(ostream &os, string prefix) {
         }
 }
 
-prog::prog(funcs *f, exts *e) : functions(f), e(e) {
+prog::prog(funcs *f, exts *e) : functions(f), externs(e) {
     // Check there is a function named "run"
     if (function_table.count("run") == 0) error("Function 'run' not found.");
 }
@@ -393,7 +430,7 @@ void prog::yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
         os << prefix << "funcs:" << endl;
         functions->yaml(os, prefix + "  ");
-        if (!e) return;
+        if (!externs) return;
         os << prefix << "externs: " << endl;
-        e->yaml(os, prefix + "  ");
+        externs->yaml(os, prefix + "  ");
 }

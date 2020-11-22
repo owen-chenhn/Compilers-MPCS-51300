@@ -33,3 +33,5 @@
 
 # test directories
 test/
+
+.vscode

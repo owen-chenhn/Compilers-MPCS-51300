@@ -3,12 +3,20 @@
 #include <string>
 #include <getopt.h> 
 #include <fstream>
+#include <memory>
+#include <system_error>
+#include <cstdlib>
 
 #include "parser.tab.h"
 #include "ast.h"
 #include "ekcc.h"
 
+#include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
+
 using namespace std;
+using namespace llvm;
 
 /* Print helper messages. */
 void Header() {
@@ -17,12 +25,13 @@ void Header() {
 }
 
 void Usage() {
-    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm] -o <output-file> <input-file>\n" << 
+    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm|-jit] -o <output-file> <input-file>\n" << 
             "\t" << "-h|-?: Print helper message.\n" << 
             "\t" << "-v: Enable verbose mode.\n" << 
             "\t" << "-O: Enable optimization.\n" << 
             "\t" << "-emit-ast: Produce the AST of the input program to the output file.\n" << 
             "\t" << "-emit-llvm: Produce the LLVM IR of the input program to the output file.\n" << 
+            "\t" << "-jit: Produce the executable of the input program as the output file.\n" <<
             "\t" << "-o <output-file>: Path to the output file.\n" << 
             "\t" << "<input-file>: Path to the input ek program.\n";
 }
@@ -33,7 +42,7 @@ int main(int argc, char* argv[]) {
     extern FILE *yyin;
     extern prog *the_prog;
 
-    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false;
+    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false, jit = false;
     string output = "";
 
     // Command-line options parsing
@@ -41,6 +50,7 @@ int main(int argc, char* argv[]) {
     const struct option longopts[] = {
         {"emit-ast", no_argument, nullptr, 'a'}, 
         {"emit-llvm", no_argument, nullptr, 'l'},
+        {"jit", no_argument, nullptr, 'j'},
         {0, 0, 0, 0}
     };
     int optret;
@@ -67,11 +77,14 @@ int main(int argc, char* argv[]) {
         case 'l' :
             emit_llvm = true;
             break;
+        case 'j' :
+            jit = true;
+            break; 
         }
     }
     
-    if (emit_ast && emit_llvm) {
-        cout << "error: flag -emit-ast and flag -emit-llvm cannot be set simultaneously.\n";
+    if (emit_ast && emit_llvm || emit_ast && jit || emit_llvm && jit) {
+        cout << "error: At most one of the flags -emit-ast / -emit-llvm / -jit can be set.\n";
         exit(-1);
     }
     if (output.size() == 0) {
@@ -90,9 +103,18 @@ int main(int argc, char* argv[]) {
     }
     yyin = in_f;
 
+    if (verbose) {
+        Header();
+        cout << "Input file path: " << argv[optind] << "\nStarting parsing input program and build AST.\n";
+    }
+
     do {
         yyparse();
     } while (!feof(yyin)); 
+
+    if (verbose) {
+        cout << "Finished input parsing.\n";
+    }
 
     ofstream os(output, ios::out);
     if (!os) {
@@ -101,11 +123,44 @@ int main(int argc, char* argv[]) {
     }
 
     if (emit_ast) {
+        if (verbose) cout << "Emit AST to output file: " << output << endl;
         os << "---" << endl;
         the_prog->yaml(os, "");
         os << "..." << endl;
+        if (verbose) cout << "Finished emitting AST.\n";
+    } else { // need to codegen 
+        if (verbose) cout << "Start generating LLVM IR code.\n";
+        Module *the_module = the_prog->code_gen();
+
+        // Add optimization
+        if (optimize) { cout << "Start code optimization.\n"; }
+
+        error_code EC;
+        string raw_OS_path = emit_llvm ? output : "intermediate.ll";
+        raw_fd_ostream OS(raw_OS_path, EC);
+        the_module->print(OS, nullptr);
+        OS.flush();
+        if (verbose) cout << "Finished generating LLVM IR code.\n";
+
+        if (emit_llvm) {
+            // No more things need to do.
+            goto quit;
+        } else if (jit) {
+            cout << "Run jit.\n";
+            the_prog->jit();
+        } else { // generate exe 
+            if (verbose) cout << "Compile code to an executable.\n";
+            string command = optimize ? 
+                             "llc -filetype=obj -O3 intermediate.ll && clang++ lib.o intermediate.o -O3 -o " : 
+                             "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o ";
+            command += output;
+            std::system(command.c_str());
+            std::system("rm intermediate.ll");
+        }
     }
 
+quit:
     delete the_prog;
+    if (verbose) cout << "Compilation finished. Quit.\n";
     return 0;
 }
