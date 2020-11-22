@@ -63,14 +63,6 @@ Function *LogErrorF(const string& str) {
     return nullptr;
 }
 
-// Helper function to dereference a pointer value
-Value* expr_deref(Value *expression) {
-    if (expression && expression->getType()->isPointerTy()) {
-        return builder->CreateLoad(expression, "deref");
-    }
-    return expression;
-}
-
 AllocaInst *vdecl::code_gen() {
     AllocaInst *alloc_var = builder->CreateAlloca(map_llvm_type(tp->kind, tp->ref), 
                                     nullptr, variable->identifier);
@@ -94,16 +86,19 @@ Value* varval::code_gen() {
     AllocaInst *alloc_v = get_var_pointer();
     if (!alloc_v) 
         return LogErrorV("Unknown variable name");
-    return builder->CreateLoad(alloc_v, variable->identifier);
+    Value *exp_v = builder->CreateLoad(alloc_v, variable->identifier);
+    if (exp_v && exp_v->getType()->isPointerTy()) 
+        exp_v = builder->CreateLoad(exp_v, "loadtmp");
+    return exp_v;
 }
 
 Value *assign::code_gen() {
-    Value *exp_v = expr_deref(expression->code_gen());
+    Value *exp_v = expression->code_gen();
     if (!exp_v) return nullptr;
-    Value *alloc_v = name_to_Value[variable->variable->identifier];
+    Value *alloc_v = variable->get_var_pointer();
     if (!alloc_v) return LogErrorV("Unknown variable name");
     if (variable->exp_type->ref) 
-        alloc_v = builder->CreateLoad(alloc_v, "deref");
+        alloc_v = builder->CreateLoad(alloc_v, "loadtmp");
 
     builder->CreateStore(exp_v, alloc_v);
     return exp_v;
@@ -122,7 +117,7 @@ Value* funccall::code_gen() {
         expr *expression = params->expressions[i++];
         Value *arg_v = Arg.getType()->isPointerTy() ? 
                         ((varval *)expression)->get_var_pointer() : 
-                        expr_deref(expression->code_gen());
+                        expression->code_gen();
         args.push_back(arg_v);
     }
 
@@ -132,15 +127,15 @@ Value* funccall::code_gen() {
 }
 
 Value* uop::code_gen() {
-    if (kind == uop_not) return builder->CreateNot(expr_deref(expression->code_gen()), "nottmp");
+    if (kind == uop_not) return builder->CreateNot(expression->code_gen(), "nottmp");
     return expression->exp_type->kind == type::t_float ? 
-           builder->CreateFNeg(expr_deref(expression->code_gen()), "negfptmp") : 
-           builder->CreateNeg(expr_deref(expression->code_gen()), "negtmp", true, true);
+           builder->CreateFNeg(expression->code_gen(), "negfptmp") : 
+           builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
 }
 
 Value* binop::code_gen() {
-    Value* L = expr_deref(lhs->code_gen());
-    Value* R = expr_deref(rhs->code_gen());
+    Value* L = lhs->code_gen();
+    Value* R = rhs->code_gen();
 
     switch (kind) {
         case bop_mul : 
@@ -180,7 +175,7 @@ Value* binop::code_gen() {
 
 // assuming type check has already been performed 
 Value* castexp::code_gen() {
-    Value* e = expr_deref(expression->code_gen());
+    Value* e = expression->code_gen();
     switch(tp->kind) {
         case type::t_int :
             return builder->CreateIntCast(e, map_llvm_type(type::t_int, false), false, "castinttmp");
@@ -193,7 +188,7 @@ Value* castexp::code_gen() {
 
 Value *ret::code_gen() {
     if (expression) {
-        Value *exp_v = expr_deref(expression->code_gen());
+        Value *exp_v = expression->code_gen();
         if (!exp_v) return nullptr;
         return builder->CreateRet(exp_v);
     }
@@ -204,13 +199,12 @@ Value *ret::code_gen() {
 Value *vdeclstmt::code_gen() {
     AllocaInst *alloc_v = variable->code_gen();
     Value *exp_v;
-    if (variable->tp->ref && !expression->exp_type->ref) {
-        exp_v = ((varval *)expression)->get_var_pointer();
-    }
-    else {
+    if (!variable->tp->ref) {
         exp_v = expression->code_gen();
-        if (!variable->tp->ref && expression->exp_type->ref) 
-            exp_v = expr_deref(exp_v);
+    } else {
+        exp_v = ((varval *)expression)->get_var_pointer();
+        if (expression->exp_type->ref) 
+            exp_v = builder->CreateLoad(exp_v, "loadtmp");
     }
     if (!exp_v || !alloc_v) return nullptr;
 
@@ -226,7 +220,7 @@ Value *whilestmt::code_gen() {
     
     builder->CreateBr(head_bb);
     builder->SetInsertPoint(head_bb);
-    Value *cond_v = expr_deref(condition->code_gen());
+    Value *cond_v = condition->code_gen();
     if (!cond_v) return nullptr;
     builder->CreateCondBr(cond_v, body_bb, exit_bb);
 
@@ -243,7 +237,7 @@ Value *whilestmt::code_gen() {
 }
 
 Value *ifstmt::code_gen() {
-    Value *cond_v = expr_deref(condition->code_gen());
+    Value *cond_v = condition->code_gen();
     if (!cond_v) return nullptr;
 
     Function *the_func = builder->GetInsertBlock()->getParent();
@@ -277,9 +271,9 @@ Value *print::code_gen() {
     string format_str = float_flag ? "%f\n" : "%d\n";
     Value *str_v = builder->CreateGlobalStringPtr(StringRef(format_str));
 
-    Value *exp_v = expr_deref(expression->code_gen());
+    Value *exp_v = expression->code_gen();
     if (float_flag) 
-        exp_v = builder->CreateFPExt(exp_v, Type::getDoubleTy(*context), "fpext");
+        exp_v = builder->CreateFPExt(exp_v, Type::getDoubleTy(*context), "fpexttmp");
 
     vector<Value *> args = { str_v, exp_v };
     Function* printFunc = module->getFunction("printf");
@@ -302,14 +296,21 @@ Value *printslit::code_gen() {
 Function *func::code_gen() {
     unsigned params = variable_declarations ? variable_declarations->variables.size() : 0;
     vector<Type *> param_types;
+    vector<unsigned> noalis_index;
     for (unsigned i = 0; i < params; i++) {
         type *tp = variable_declarations->variables[i]->tp;
         param_types.push_back(map_llvm_type(tp->kind, tp->ref));
+
+        if (tp->noalias) noalis_index.push_back(i);
     }
 
     Type *ret_type = map_llvm_type(rt->kind, false);
     FunctionType *ft = FunctionType::get(ret_type, param_types, false);
     Function *f = Function::Create(ft, Function::ExternalLinkage, globid->identifier, module.get());
+
+    for (unsigned idx : noalis_index) {
+        f->addParamAttr(idx, Attribute::NoAlias);
+    }
 
     unsigned i = 0;
     for (auto &arg : f->args()) {
