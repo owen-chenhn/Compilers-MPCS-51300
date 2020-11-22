@@ -150,7 +150,10 @@ int main(int argc, char* argv[]) {
             the_prog->jit();
         } else { // generate exe 
             if (verbose) cout << "Compile code to an executable.\n";
-            string command = "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o " + output;
+            string command = optimize ? 
+                             "llc -filetype=obj -O3 intermediate.ll && clang++ lib.o intermediate.o -O3 -o " : 
+                             "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o ";
+            command += output;
             std::system(command.c_str());
             std::system("rm intermediate.ll");
         }
