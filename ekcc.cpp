@@ -11,9 +11,16 @@
 #include "ast.h"
 #include "ekcc.h"
 
+#include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+
 
 using namespace std;
 using namespace llvm;
@@ -130,10 +137,36 @@ int main(int argc, char* argv[]) {
         if (verbose) cout << "Finished emitting AST.\n";
     } else { // need to codegen 
         if (verbose) cout << "Start generating LLVM IR code.\n";
-        Module *the_module = the_prog->code_gen();
+        Module* the_module = the_prog->code_gen();
 
         // Add optimization
-        if (optimize) { cout << "Start code optimization.\n"; }
+        if (optimize) { 
+            if (verbose) cout << "Start code optimization.\n"; 
+
+            unique_ptr<legacy::FunctionPassManager> FPM(new legacy::FunctionPassManager(the_module));
+        
+            FPM->add(createInstructionCombiningPass());
+            FPM->add(createReassociatePass());
+            FPM->add(createGVNPass());
+            FPM->add(createCFGSimplificationPass()); 
+            
+            unique_ptr<legacy::PassManager> MPM(new legacy::PassManager);
+
+            PassManagerBuilder PMBuilder;
+            PMBuilder.OptLevel = 3;
+            PMBuilder.SizeLevel = 0;
+            PMBuilder.Inliner = llvm::createFunctionInliningPass(PMBuilder.OptLevel, PMBuilder.SizeLevel, false);
+            PMBuilder.LoopVectorize = true;
+            PMBuilder.populateFunctionPassManager(*FPM);
+            PMBuilder.populateModulePassManager(*MPM);
+
+            FPM->doInitialization();
+            for (Function &F : *the_module)
+                FPM->run(F);
+            FPM->doFinalization();
+
+            MPM->run(*the_module);
+        }
 
         error_code EC;
         string raw_OS_path = emit_llvm ? output : "intermediate.ll";
