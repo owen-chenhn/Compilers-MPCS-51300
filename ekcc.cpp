@@ -131,25 +131,33 @@ int main(int argc, char* argv[]) {
     } else { // need to codegen 
         if (verbose) cout << "Start generating LLVM IR code.\n";
         Module *the_module = the_prog->code_gen();
+
+        // Add optimization
+        if (optimize) { cout << "Start code optimization.\n"; }
+
         error_code EC;
-        raw_fd_ostream OS("intermediate.ll", EC);
+        string raw_OS_path = emit_llvm ? output : "intermediate.ll";
+        raw_fd_ostream OS(raw_OS_path, EC);
         the_module->print(OS, nullptr);
         OS.flush();
         if (verbose) cout << "Finished generating LLVM IR code.\n";
 
-        if (emit_llvm) { // no exe output 
-            if (verbose) cout << "Emit LLVM IR code to output file: " << output << endl;
-            raw_fd_ostream emit_OS(output, EC);
-            the_module->print(emit_OS, nullptr);
-            emit_OS.flush();
-            if (verbose) cout << "Finished emitting LLVM IR code.\n";
+        if (emit_llvm) {
+            // No more things need to do.
+            goto quit;
+        } else if (jit) {
+            cout << "Run jit.\n";
+            the_prog->jit();
         } else { // generate exe 
+            if (verbose) cout << "Compile code to an executable.\n";
             string command = "llc -filetype=obj intermediate.ll && clang++ lib.o intermediate.o -o " + output;
             std::system(command.c_str());
+            std::system("rm intermediate.ll");
         }
-        std::system("rm intermediate.ll");
-        }
+    }
 
+quit:
     delete the_prog;
+    if (verbose) cout << "Compilation finished. Quit.\n";
     return 0;
 }
