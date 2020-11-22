@@ -178,9 +178,13 @@ Value* castexp::code_gen() {
     Value* e = expression->code_gen();
     switch(tp->kind) {
         case type::t_int :
-            return builder->CreateIntCast(e, map_llvm_type(type::t_int, false), false, "castinttmp");
+            return expression->exp_type->kind == type::t_float ? 
+                builder->CreateFPToUI(e, map_llvm_type(type::t_int, false), "castfpittmp") : 
+                builder->CreateIntCast(e, map_llvm_type(type::t_int, false), false, "castitittmp");
         case type::t_float:
-            return builder->CreateFPCast(e, map_llvm_type(type::t_float, false), "castfloattmp");
+            return expression->exp_type->kind == type::t_float ? 
+                builder->CreateFPCast(e, map_llvm_type(type::t_float, false), "castfpfptmp") : 
+                builder->CreateUIToFP(e, map_llvm_type(type::t_float, false), "castitfptmp") ;
         case type::t_bool:
             return e;
     }
