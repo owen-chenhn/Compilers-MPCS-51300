@@ -39,3 +39,5 @@ We currently still have some issues linking the getarg functions in customed lib
 For assignment 4,  
 
 We have fixed all the deficits mentioned above. Optimization is added.  
+
+Note: for now we haven't implemented **JIT** execution yet. Please statically compile input program and run the executable.  
