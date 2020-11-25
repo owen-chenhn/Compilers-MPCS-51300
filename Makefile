@@ -1,5 +1,5 @@
 CXXFLAG = -std=c++11 #-Wall -Wextra -pedantic 
-LLVMFLAG = `llvm-config --cxxflags --ldflags --system-libs --libs`
+LLVMFLAG = `llvm-config --cxxflags --ldflags --system-libs --libs core ipo executionengine mcjit interpreter analysis native` -rdynamic
 CXX=clang++
 
 all: ekcc lib

@@ -436,7 +436,7 @@ struct prog : public node {
 
     prog(funcs *f, exts *e = 0);
     Module *code_gen();
-    void jit() {}
+    void jit(int argc, char** argv);
 
     virtual void yaml(ostream &os, string prefix);
 
