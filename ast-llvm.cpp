@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <memory>
+#include <cstdlib>
 
 #include "llvm/IR/Type.h"
 #include "llvm/IR/BasicBlock.h"
@@ -18,6 +19,9 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/ADT/StringRef.h"
+
+#include "llvm/Support/TargetSelect.h"
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
 
 using namespace std;
 using namespace llvm;
@@ -378,4 +382,46 @@ Module *prog::code_gen() {
 
     verifyModule(*module, &llvm::errs());
     return module.get();
+}
+
+// Define function pointer of the run function.
+typedef int (*runFunc)();
+
+// Static variables to implement arg/argf functions. 
+static int argcount = 0;
+static char** argstrings = NULL;
+
+extern "C" {
+    int arg(int i) {
+        if (i < 0 || i >= argcount) {
+            cout << "Error: arg()'s index out of bound.\n";
+            exit(-1);
+        }
+        return atoi(argstrings[i]);
+    }
+
+    float argf(int i) {
+        if (i < 0 || i >= argcount) {
+            cout << "Error: argf()'s index out of bound.\n";
+            exit(-1);
+        }
+        return atof(argstrings[i]);
+    }
+}
+
+/* The JIT implementation. */
+void prog::jit(int argc, char** argv) {
+    argcount = argc;
+    argstrings = argv;
+    
+    LLVMLinkInMCJIT();
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+
+    ExecutionEngine *ee = EngineBuilder(std::move(module)).create();
+    ee->finalizeObject();
+    
+    runFunc run = (runFunc) ee->getFunctionAddress("run");
+    run();
 }

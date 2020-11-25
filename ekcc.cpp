@@ -32,14 +32,14 @@ void Header() {
 }
 
 void Usage() {
-    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm|-jit] -o <output-file> <input-file>\n" << 
+    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-emit-ast|-emit-llvm] [-jit] -o <output-file> <input-file>\n" << 
             "\t" << "-h|-?: Print helper message.\n" << 
             "\t" << "-v: Enable verbose mode.\n" << 
             "\t" << "-O: Enable optimization.\n" << 
             "\t" << "-emit-ast: Produce the AST of the input program to the output file.\n" << 
             "\t" << "-emit-llvm: Produce the LLVM IR of the input program to the output file.\n" << 
-            "\t" << "-jit: Produce the executable of the input program as the output file.\n" <<
-            "\t" << "-o <output-file>: Path to the output file.\n" << 
+            "\t" << "-jit: Run input program directly. [Note: when this flag is present, <output-file> (-o flag) does not need to be specified]\n" <<
+            "\t" << "-o <output-file>: Path to the output file. [Note: whenever -jit flag is present, an output file is always produced]\n" << 
             "\t" << "<input-file>: Path to the input ek program.\n";
 }
 
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     extern FILE *yyin;
     extern prog *the_prog;
 
-    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false, jit = false;
+    bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false, out_flag = false, jit = false;
     string output = "";
 
     // Command-line options parsing
@@ -76,6 +76,7 @@ int main(int argc, char* argv[]) {
             optimize = true;
             break;
         case 'o' :
+            out_flag = true;
             output = optarg;
             break;
         case 'a' :
@@ -90,16 +91,20 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    if (emit_ast && emit_llvm || emit_ast && jit || emit_llvm && jit) {
-        cout << "error: At most one of the flags -emit-ast / -emit-llvm / -jit can be set.\n";
+    if (emit_ast && emit_llvm) {
+        cout << "error: At most one of the flags -emit-ast / -emit-llvm can be set.\n";
         exit(-1);
     }
-    if (output.size() == 0) {
-        cout << "error: no output file specified.\n";
+    if ((emit_ast || emit_llvm) && !out_flag) {
+        cout << "error: emit flag (-emit-*) set but output path (-o) not set.\n";
+        exit(-1);
+    }
+    if (!out_flag && !jit) {
+        cout << "error: You need to specify either an output path (-o) or JIT (-jit).\n";
         exit(-1);
     }
     if (optind == argc) {
-        cout << "error: no input file specified.\n";
+        cout << "error: No input file specified.\n";
         exit(-1);
     }
 
@@ -120,52 +125,58 @@ int main(int argc, char* argv[]) {
     } while (!feof(yyin)); 
 
     if (verbose) {
-        cout << "Finished input parsing.\n";
+        cout << "Start generating LLVM IR code.\n";
     }
+    Module* the_module = the_prog->code_gen();
 
-    ofstream os(output, ios::out);
-    if (!os) {
-        cout << "error: failed to open output file: " << output << endl;
-        exit(-1);
-    }
+    // Add optimization
+    if (optimize) { 
+        if (verbose) cout << "Start code optimization.\n"; 
 
-    if (emit_ast) {
-        if (verbose) cout << "Emit AST to output file: " << output << endl;
-        os << "---" << endl;
-        the_prog->yaml(os, "");
-        os << "..." << endl;
-        if (verbose) cout << "Finished emitting AST.\n";
-    } else { // need to codegen 
-        if (verbose) cout << "Start generating LLVM IR code.\n";
-        Module* the_module = the_prog->code_gen();
-
-        // Add optimization
-        if (optimize) { 
-            if (verbose) cout << "Start code optimization.\n"; 
-
-            unique_ptr<legacy::FunctionPassManager> FPM(new legacy::FunctionPassManager(the_module));
+        unique_ptr<legacy::FunctionPassManager> FPM(new legacy::FunctionPassManager(the_module));
+    
+        FPM->add(createInstructionCombiningPass());
+        FPM->add(createReassociatePass());
+        FPM->add(createGVNPass());
+        FPM->add(createCFGSimplificationPass()); 
         
-            FPM->add(createInstructionCombiningPass());
-            FPM->add(createReassociatePass());
-            FPM->add(createGVNPass());
-            FPM->add(createCFGSimplificationPass()); 
-            
-            unique_ptr<legacy::PassManager> MPM(new legacy::PassManager);
+        unique_ptr<legacy::PassManager> MPM(new legacy::PassManager);
 
-            PassManagerBuilder PMBuilder;
-            PMBuilder.OptLevel = 3;
-            PMBuilder.SizeLevel = 0;
-            PMBuilder.Inliner = llvm::createFunctionInliningPass(PMBuilder.OptLevel, PMBuilder.SizeLevel, false);
-            PMBuilder.LoopVectorize = true;
-            PMBuilder.populateFunctionPassManager(*FPM);
-            PMBuilder.populateModulePassManager(*MPM);
+        PassManagerBuilder PMBuilder;
+        PMBuilder.OptLevel = 3;
+        PMBuilder.SizeLevel = 0;
+        PMBuilder.Inliner = llvm::createFunctionInliningPass(PMBuilder.OptLevel, PMBuilder.SizeLevel, false);
+        PMBuilder.LoopVectorize = true;
+        PMBuilder.populateFunctionPassManager(*FPM);
+        PMBuilder.populateModulePassManager(*MPM);
 
-            FPM->doInitialization();
-            for (Function &F : *the_module)
-                FPM->run(F);
-            FPM->doFinalization();
+        FPM->doInitialization();
+        for (Function &F : *the_module)
+            FPM->run(F);
+        FPM->doFinalization();
 
-            MPM->run(*the_module);
+        MPM->run(*the_module);
+    }
+
+    if (jit) {
+        if (verbose) cout << "Run program using JIT.\n";
+        // Set the argument pointer
+        int argidx = optind + 1;
+        the_prog->jit(argc-argidx, argv+argidx);
+    }
+
+    if (out_flag) {
+        ofstream os(output, ios::out);
+        if (!os) {
+            cout << "error: failed to open output file: " << output << endl;
+            exit(-1);
+        }
+        if (emit_ast) {
+            if (verbose) cout << "Emit AST to output file: " << output << endl;
+            os << "---" << endl;
+            the_prog->yaml(os, "");
+            os << "..." << endl;
+            goto quit;
         }
 
         error_code EC;
@@ -173,15 +184,8 @@ int main(int argc, char* argv[]) {
         raw_fd_ostream OS(raw_OS_path, EC);
         the_module->print(OS, nullptr);
         OS.flush();
-        if (verbose) cout << "Finished generating LLVM IR code.\n";
-
-        if (emit_llvm) {
-            // No more things need to do.
-            goto quit;
-        } else if (jit) {
-            cout << "Run jit.\n";
-            the_prog->jit();
-        } else { // generate exe 
+        if (!emit_llvm)  {
+            // generate exe 
             if (verbose) cout << "Compile code to an executable.\n";
             string command = optimize ? 
                              "llc -filetype=obj -O3 intermediate.ll && clang++ lib.o intermediate.o -O3 -o " : 
