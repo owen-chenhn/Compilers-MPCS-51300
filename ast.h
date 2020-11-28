@@ -108,7 +108,7 @@ struct exps : public node {
 struct lit : public expr {
     int it;
 
-    lit(int i): expr(new type(type::t_int)), it(i)  {}
+    lit(int i, bool bool_flag): expr(new type(bool_flag ? type::t_bool : type::t_int)), it(i) {}
 
     virtual void yaml(ostream &os, string prefix);
 

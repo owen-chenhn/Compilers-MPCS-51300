@@ -34,8 +34,8 @@ ref          { return REF; }
 "&&"         { return AND; }
 "||"         { return OR; }
 
-true         {yylval.ival = atoi("1"); return LITERAL_INT; }
-false        {yylval.ival = atoi("0"); return LITERAL_INT; }
+true         {yylval.ival = atoi("1"); return LITERAL_BOOL; }
+false        {yylval.ival = atoi("0"); return LITERAL_BOOL; }
 [$][a-zA-Z_]+[a-zA-Z0-9_]*  { yylval.sval = strdup(yytext); return IDENTIFIER; }
 [a-zA-Z_]+[a-zA-Z0-9_]*  { yylval.sval = strdup(yytext); return GIDENTIFIER; }
 [0-9]+                  { yylval.ival = atoi(yytext); return LITERAL_INT; }
