@@ -53,7 +53,7 @@
 %token EQUAL AND OR
 
 // Identifiers and literals
-%token <ival> LITERAL_INT
+%token <ival> LITERAL_INT LITERAL_BOOL
 %token <fval> LITERAL_FLOAT 
 %token <sval> IDENTIFIER GIDENTIFIER LITERAL_STR 
 
@@ -139,7 +139,8 @@ exp      : '(' exp ')'                            {$$ = $2; }
          | binop                                  {$$ = $1; }
          | assign                                 {$$ = $1; }
          | uop                                    {$$ = $1; }
-         | LITERAL_INT                            {$$ = new lit($1); }
+         | LITERAL_INT                            {$$ = new lit($1, false); }
+         | LITERAL_BOOL                           {$$ = new lit($1, true); }
          | LITERAL_FLOAT                          {$$ = new flit($1); }
          | varid                                  {$$ = new varval($1); }
          | globid '(' exps ')'                    {$$ = new funccall($1, $3); }

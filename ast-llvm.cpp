@@ -75,7 +75,9 @@ AllocaInst *vdecl::code_gen() {
 }
 
 Value* lit::code_gen() {
-    return ConstantInt::get(map_llvm_type(type::t_int, false), it);
+    return exp_type->kind == type::t_int ? 
+           ConstantInt::get(map_llvm_type(type::t_int, false), it) : 
+           ConstantInt::get(map_llvm_type(type::t_bool,false), it);
 }
 
 Value* flit::code_gen() {
