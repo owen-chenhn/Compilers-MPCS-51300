@@ -112,6 +112,7 @@ struct lit : public expr {
 
     virtual void yaml(ostream &os, string prefix);
 
+    string get_str();
     Value* code_gen();
 };
 
