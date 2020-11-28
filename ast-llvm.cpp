@@ -130,44 +130,74 @@ Value* funccall::code_gen() {
     return builder->CreateCall(called_func, args, "calltmp");
 }
 
+/* Functions that generate code for cint type. All the parameters must be of type t_cint. */
+static Value* cint_neg(Value *unary) {}
+
+static Value* cint_add(Value *lhs, Value *rhs) {}
+
+static Value* cint_sub(Value *lhs, Value *rhs) {}
+
+static Value* cint_mul(Value *lhs, Value *rhs) {}
+
+static Value* cint_div(Value *lhs, Value *rhs) {}
+
 Value* uop::code_gen() {
-    if (kind == uop_not) return builder->CreateNot(expression->code_gen(), "nottmp");
-    return expression->exp_type->kind == type::t_float ? 
-           builder->CreateFNeg(expression->code_gen(), "negfptmp") : 
-           builder->CreateNeg(expression->code_gen(), "negtmp", true, true);
+    Value *exp_v = expression->code_gen();
+    type::type_kind t = expression->exp_type->kind;
+
+    if (kind == uop_not) return builder->CreateNot(exp_v, "nottmp");
+    return t == type::t_float ? 
+           builder->CreateFNeg(exp_v, "negfptmp") : (
+               t == type::t_cint ? 
+               cint_neg(exp_v) :
+               builder->CreateNeg(exp_v, "negtmp", true, true)
+           );
 }
 
 Value* binop::code_gen() {
     Value* L = lhs->code_gen();
     Value* R = rhs->code_gen();
+    type::type_kind t = lhs->exp_type->kind;
 
     switch (kind) {
         case bop_mul : 
-            return lhs->exp_type->kind == type::t_float ?
-                   builder->CreateFMul(L, R, "mulfptmp") : 
-                   builder->CreateMul(L, R, "multmp", true, true);
+            return t == type::t_float ?
+                   builder->CreateFMul(L, R, "mulfptmp") : (
+                       t == type::t_cint ? 
+                       cint_mul(L, R) :
+                       builder->CreateMul(L, R, "multmp", true, true)
+                    );
         case bop_div : 
-            return lhs->exp_type->kind == type::t_float ? 
-                   builder->CreateFDiv(L, R, "divfptmp") : 
-                   builder->CreateSDiv(L, R, "sdivtmp");
+            return t == type::t_float ? 
+                   builder->CreateFDiv(L, R, "divfptmp") : (
+                       t == type::t_cint ? 
+                       cint_div(L, R) :
+                       builder->CreateSDiv(L, R, "sdivtmp")
+                   );
         case bop_add : 
-            return lhs->exp_type->kind == type::t_float ?
-                   builder->CreateFAdd(L, R, "addfptmp") : 
-                   builder->CreateAdd(L, R, "addtmp", true, true);
+            return t == type::t_float ?
+                   builder->CreateFAdd(L, R, "addfptmp") : (
+                       t == type::t_cint ? 
+                       cint_add(L, R) :
+                       builder->CreateAdd(L, R, "addtmp", true, true)
+                   );
         case bop_sub : 
-            return lhs->exp_type->kind == type::t_float ?
-                   builder->CreateFSub(L, R, "subfptmp") : 
-                   builder->CreateSub(L, R, "subtmp", true, true);
+            return t == type::t_float ?
+                   builder->CreateFSub(L, R, "subfptmp") : (
+                       t == type::t_cint ? 
+                       cint_sub(L, R) :
+                       builder->CreateSub(L, R, "subtmp", true, true)
+                   );
         case bop_eq  : 
-            return lhs->exp_type->kind == type::t_float ?
+            return t == type::t_float ?
                    builder->CreateFCmpUEQ(L, R, "eqfptmp") : 
                    builder->CreateICmpEQ(L, R, "eqtmp");
         case bop_lt  : 
-            return lhs->exp_type->kind == type::t_float ?
+            return t == type::t_float ?
                    builder->CreateFCmpULT(L, R, "ltfptmp") : 
                    builder->CreateICmpULT(L, R, "lttmp");
         case bop_gt  : 
-            return lhs->exp_type->kind == type::t_float ?
+            return t == type::t_float ?
                    builder->CreateFCmpUGT(L, R, "gtfptmp") : 
                    builder->CreateICmpUGT(L, R, "gttmp");
         case bop_and :
