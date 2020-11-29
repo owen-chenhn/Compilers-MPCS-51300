@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <cstdlib>
+#include <climits>
 
 #include "llvm/IR/Type.h"
 #include "llvm/IR/BasicBlock.h"
@@ -19,6 +20,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/GlobalValue.h"
 
 #include "llvm/Support/TargetSelect.h"
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -130,16 +132,71 @@ Value* funccall::code_gen() {
     return builder->CreateCall(called_func, args, "calltmp");
 }
 
+
+// Helper functions to generate code for overflow check of cint calculations
+static void check_code_gen(Value *flag) {
+    Function *the_func = builder->GetInsertBlock()->getParent();
+    BasicBlock *overflow_bb = BasicBlock::Create(*context, "overflow", the_func), 
+               *normal_bb = BasicBlock::Create(*context, "normal");
+    builder->CreateCondBr(flag, overflow_bb, normal_bb);
+
+    builder->SetInsertPoint(overflow_bb);
+    // print error message and call exit(-1)
+    Value *str_v = builder->CreateGlobalStringPtr(StringRef("Runtime error: cint overflows.\n"));
+    Function* printFunc = module->getFunction("printf");
+    builder->CreateCall(printFunc, str_v, "callprintf");
+
+    // declare and call exit()
+    FunctionType *ft = FunctionType::get(Type::getVoidTy(*context), Type::getInt32Ty(*context), false);
+    Constant *exit_func = module->getOrInsertFunction("exit", ft);
+    builder->CreateCall(exit_func, ConstantInt::get(Type::getInt32Ty(*context), -1));
+    builder->CreateBr(normal_bb);
+
+    the_func->getBasicBlockList().push_back(normal_bb);
+    builder->SetInsertPoint(normal_bb);
+}
+
+static Value* check_overflow(Value *aggregate) {
+    Value *result = builder->CreateExtractValue(aggregate, 0, "extract_res"), 
+          *overflow = builder->CreateExtractValue(aggregate, 1, "extract_flag");
+    
+    check_code_gen(overflow);
+    return result;
+}
+
 /* Functions that generate code for cint type. All the parameters must be of type t_cint. */
-static Value* cint_neg(Value *unary) {}
+static Value* cint_neg(Value *unary) {
+    Value *v = builder->CreateBinaryIntrinsic(Intrinsic::ssub_with_overflow, 
+                    ConstantInt::get(Type::getInt32Ty(*context), 0), unary, "cint_negtmp");
+    return check_overflow(v);
+}
 
-static Value* cint_add(Value *lhs, Value *rhs) {}
+static Value* cint_add(Value *lhs, Value *rhs) {
+    Value *v = builder->CreateBinaryIntrinsic(Intrinsic::sadd_with_overflow, lhs, rhs, "cint_addtmp");
+    return check_overflow(v);
+}
 
-static Value* cint_sub(Value *lhs, Value *rhs) {}
+static Value* cint_sub(Value *lhs, Value *rhs) {
+    Value *v = builder->CreateBinaryIntrinsic(Intrinsic::ssub_with_overflow, lhs, rhs, "cint_subtmp");
+    return check_overflow(v);
+}
 
-static Value* cint_mul(Value *lhs, Value *rhs) {}
+static Value* cint_mul(Value *lhs, Value *rhs) {
+    Value *v = builder->CreateBinaryIntrinsic(Intrinsic::smul_with_overflow, lhs, rhs, "cint_multmp");
+    return check_overflow(v);
+}
 
-static Value* cint_div(Value *lhs, Value *rhs) {}
+static Value* cint_div(Value *lhs, Value *rhs) {
+    // Check whether (rhs == 0 || (lhs == INT_MIN && rhs == -1))
+    Value *div_by_zero = builder->CreateICmpEQ(rhs, ConstantInt::get(Type::getInt32Ty(*context), 0), "eqzerotmp"); 
+    Value *intmin_overflow = builder->CreateAnd(
+                                builder->CreateICmpEQ(lhs, ConstantInt::get(Type::getInt32Ty(*context), INT_MIN), "eqintmintmp"), 
+                                builder->CreateICmpEQ(rhs, ConstantInt::get(Type::getInt32Ty(*context), -1), "eqnegonetmp"), 
+                                "cint_divandtmp");
+    Value *flag = builder->CreateOr(div_by_zero, intmin_overflow, "cint_divcheck");
+    check_code_gen(flag);
+    return builder->CreateSDiv(lhs, rhs, "cint_divtmp");
+}
 
 Value* uop::code_gen() {
     Value *exp_v = expression->code_gen();
