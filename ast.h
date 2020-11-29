@@ -158,7 +158,10 @@ struct funccall : public expr {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0);
+    funccall(id *gid, exps *p = 0): expr(nullptr), globid(gid), params(p) {
+        if (!p) params = new exps();
+    }
+
     void check_type();
 
     virtual void yaml(ostream &os, string prefix);
@@ -270,19 +273,16 @@ struct stmts : public node {
 struct blk : public stmt {
     stmts *statements;
 
-    blk(stmts *ss = 0) : statements(ss) {}
+    blk(stmts *ss = 0) : statements(ss) { if (!statements) statements = new stmts(); }
+
     void check_exp() {
-        if (statements) {
-            for (stmt *st : statements->statements) st->check_exp();
-        }
+        for (stmt *st : statements->statements) st->check_exp();
     }
 
     Value *code_gen() {
-        Value *ret;
-        if (statements) {
-            for (stmt *st : statements->statements) {
-                ret = st->code_gen();
-            }
+        Value *ret = nullptr;
+        for (stmt *st : statements->statements) {
+            ret = st->code_gen();
         }
         return ret;
     }

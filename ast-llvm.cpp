@@ -391,7 +391,7 @@ Value *printslit::code_gen() {
 }
 
 Function *func::code_gen() {
-    unsigned params = variable_declarations ? variable_declarations->variables.size() : 0;
+    unsigned params = variable_declarations->variables.size();
     vector<Type *> param_types;
     vector<unsigned> noalis_index;
     for (unsigned i = 0; i < params; i++) {
@@ -435,7 +435,7 @@ Function *func::code_gen() {
 }
 
 Function *ext::code_gen() {
-    unsigned params = type_declarations ? type_declarations->types.size() : 0;
+    unsigned params = type_declarations->types.size();
     vector<Type *> param_types;
     for (unsigned i = 0; i < params; i++) {
         type *tp = type_declarations->types[i];
@@ -459,10 +459,8 @@ static void declare_printf() {
 }
 
 Module *prog::code_gen() {
-    if (externs) {
-        for (ext *e : externs->externs) 
-            e->code_gen();
-    }
+    for (ext *e : externs->externs) 
+        e->code_gen();
 
     declare_printf();
 
