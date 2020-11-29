@@ -127,14 +127,8 @@ void assign::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
-funccall::funccall(id* gid, exps *p) : expr(nullptr), globid(gid), params(p) {
-    if (!p) params = new exps();
-}
-
 void funccall::check_type() {
-    if (params) {
-        for (expr *e : params->expressions) e->check_type(); 
-    }
+    for (expr *e : params->expressions) e->check_type(); 
     
     bool flag;
     if (function_table.count(globid->identifier)) flag = true;
@@ -146,7 +140,7 @@ void funccall::check_type() {
     if (flag) f = function_table[globid->identifier];
     else e = extern_table[globid->identifier];
 
-    unsigned num_params = params ? params->expressions.size() : 0;
+    unsigned num_params = params->expressions.size();
     unsigned num_decls;
     if (flag && f->variable_declarations) num_decls = f->variable_declarations->variables.size();
     else if (!flag && e->type_declarations) num_decls = e->type_declarations->types.size();
@@ -181,7 +175,6 @@ void funccall::yaml(ostream &os, string prefix) {
         os << prefix << "name: funccall" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
         os << prefix << "globid: " << globid->identifier << endl;
-        if (!params) return;
         os << prefix << "params:" << endl;
         params->yaml(os, prefix + "  ");
 }
@@ -274,8 +267,7 @@ void stmts::yaml(ostream &os, string prefix) {
 }
 
 void blk::yaml(ostream &os, string prefix) {
-        os << prefix << "name: blk" << endl;       
-        if (!statements) return;
+        os << prefix << "name: blk" << endl;
         os << prefix << "contents:" << endl;
         statements->yaml(os, prefix + "  ");
 }
@@ -316,6 +308,26 @@ void expstmt::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
+
+static void check_condition(expr *cond) {
+    if (cond->exp_type->kind != type::t_bool) 
+        error("Condition expression must be of type bool.");
+}
+
+void whilestmt::check_exp() {
+    condition->check_type(); 
+    check_condition(condition);
+    statement->check_exp(); 
+}
+
+void ifstmt::check_exp()  {
+    condition->check_type(); 
+    check_condition(condition);
+    statement->check_exp(); 
+    if (else_statement) 
+        else_statement->check_exp(); 
+}
+
 void whilestmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: while" << endl;
         os << prefix << "cond: " << endl;
@@ -349,6 +361,8 @@ void printslit::yaml(ostream &os, string prefix) {
 func::func(type *r, id *g, blk *b, vdecls *v) : 
     rt(r), globid(g), block(b), variable_declarations(v) 
 {
+    if (!variable_declarations) variable_declarations = new vdecls();
+
     if (extern_table.count(globid->identifier) || 
         function_table.count(globid->identifier))
         error("Duplicate declaration of function '" + globid->identifier + "'.");
@@ -359,30 +373,29 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             error("Funtion 'run' must have return type int or cint.");
         if (v != NULL) error("Funtion 'run' cannot have arguments.");
     }
-    if (block->statements == NULL && rt->kind != type::t_void) 
+    if (block->statements->statements.size() == 0 && rt->kind != type::t_void) 
         error("Funtion '" + globid->identifier + "' has empty body but non-void return type.");
 
     function_table[globid->identifier] = this;
 
     // Check function block and return type
-    if (block->statements) {
-        for (stmt *st : block->statements->statements) {
-            st->check_exp();
-            if (st->is_return()) {
-                ret *ret_stmt = (ret *) st;
-                if (!ret_stmt->expression && rt->kind != type::t_void) {
-                    error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-                    "Expect " + rt->name() + " but returns nothing.");
-                }
-                if (ret_stmt->expression && 
-                    ret_stmt->expression->exp_type->kind != rt->kind) {
-                    error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-                    "Expect " + rt->name() + " but got " + 
-                    ret_stmt->expression->exp_type->name() + ".");
-                }
+    for (stmt *st : block->statements->statements) {
+        st->check_exp();
+        if (st->is_return()) {
+            ret *ret_stmt = (ret *) st;
+            if (!ret_stmt->expression && rt->kind != type::t_void) {
+                error("Funtion '" + globid->identifier + "' has wrong return type. " + 
+                "Expect " + rt->name() + " but returns nothing.");
+            }
+            if (ret_stmt->expression && 
+                ret_stmt->expression->exp_type->kind != rt->kind) {
+                error("Funtion '" + globid->identifier + "' has wrong return type. " + 
+                "Expect " + rt->name() + " but got " + 
+                ret_stmt->expression->exp_type->name() + ".");
             }
         }
     }
+    
     vdecl_table.clear();
 }
 
@@ -392,7 +405,6 @@ void func::yaml(ostream &os, string prefix) {
         os << prefix << "globid: " << globid->identifier << endl;
         os << prefix << "blk:" << endl;
         block->yaml(os, prefix + "  ");
-        if (!variable_declarations) return;
         os << prefix << "vdecls:" << endl;
         variable_declarations->yaml(os, prefix + "  ");
 }
@@ -407,6 +419,8 @@ void funcs::yaml(ostream &os, string prefix) {
 }
 
 ext::ext(type *r, id *g, tdecls *t) : rt(r), globid(g), type_declarations(t) {
+    if (!type_declarations) type_declarations = new tdecls();
+
     if (globid->identifier == "run") error("Function 'run' cannot be external.");
     if (extern_table.count(globid->identifier)) error("Duplicate declaration of function '" + globid->identifier + "'.");
     if (rt->ref) error("Function should not return a reference.");
@@ -417,7 +431,6 @@ void ext::yaml(ostream &os, string prefix) {
         os << prefix << "name: extern" << endl;
         os << prefix << "ret_type: " << rt->name() << endl;
         os << prefix << "globid: " << globid->identifier << endl;
-        if (!rt) return;
         os << prefix << "tdecls:" << endl;
         type_declarations->yaml(os, prefix + "  ");
 } 
@@ -432,6 +445,7 @@ void exts::yaml(ostream &os, string prefix) {
 }
 
 prog::prog(funcs *f, exts *e) : functions(f), externs(e) {
+    if (!externs) externs = new exts();
     // Check there is a function named "run"
     if (function_table.count("run") == 0) error("Function 'run' not found.");
 }
@@ -440,7 +454,6 @@ void prog::yaml(ostream &os, string prefix) {
         os << prefix << "name: prog" << endl;
         os << prefix << "funcs:" << endl;
         functions->yaml(os, prefix + "  ");
-        if (!externs) return;
         os << prefix << "externs: " << endl;
         externs->yaml(os, prefix + "  ");
 }

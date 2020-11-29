@@ -158,7 +158,10 @@ struct funccall : public expr {
     id *globid;
     exps *params; 
 
-    funccall(id *gid, exps *p = 0);
+    funccall(id *gid, exps *p = 0): expr(nullptr), globid(gid), params(p) {
+        if (!p) params = new exps();
+    }
+
     void check_type();
 
     virtual void yaml(ostream &os, string prefix);
@@ -252,7 +255,7 @@ struct stmt : public node {
     // Check types of the statement's all expressions.
     virtual void check_exp() {}
     //Generate code for the statement. 
-    virtual Value *code_gen() = 0;
+    virtual void code_gen() = 0;
 }; 
 
 struct stmts : public node {
@@ -270,22 +273,12 @@ struct stmts : public node {
 struct blk : public stmt {
     stmts *statements;
 
-    blk(stmts *ss = 0) : statements(ss) {}
-    void check_exp() {
-        if (statements) {
-            for (stmt *st : statements->statements) st->check_exp();
-        }
-    }
+    blk(stmts *ss = 0) : statements(ss) { if (!statements) statements = new stmts(); }
 
-    Value *code_gen() {
-        Value *ret;
-        if (statements) {
-            for (stmt *st : statements->statements) {
-                ret = st->code_gen();
-            }
-        }
-        return ret;
+    void check_exp() {
+        for (stmt *st : statements->statements) st->check_exp();
     }
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -298,7 +291,7 @@ struct ret : public stmt {
     ret(expr *e = 0): expression(e) {}
     bool is_return() { return true; }
     void check_exp() { if (expression) expression->check_type(); }
-    Value *code_gen();
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -311,7 +304,7 @@ struct vdeclstmt : public stmt {
 
     vdeclstmt(vdecl *v, expr *e);
     void check_exp();
-    Value *code_gen();
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -323,7 +316,7 @@ struct expstmt : public stmt {
 
     expstmt(expr *e) : expression(e) {}
     void check_exp() { expression->check_type(); }
-    Value *code_gen() { return expression->code_gen(); }
+    void code_gen() { expression->code_gen(); }
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -335,8 +328,8 @@ struct whilestmt : public stmt {
     stmt *statement;
     
     whilestmt(expr *c, stmt *s) : condition(c), statement(s) {}
-    void check_exp() { condition->check_type(); statement->check_exp(); }
-    Value *code_gen();
+    void check_exp();
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -351,12 +344,8 @@ struct ifstmt : public stmt {
     ifstmt(expr *e, stmt *s, stmt *es = 0) : 
         condition(e), statement(s), else_statement(es) {}
 
-    void check_exp() { 
-        condition->check_type(); 
-        statement->check_exp(); 
-        if (else_statement) else_statement->check_exp(); 
-    }
-    Value *code_gen();
+    void check_exp();
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -368,7 +357,7 @@ struct print : public stmt {
     
     print(expr *e) : expression(e) {}
     void check_exp() { expression->check_type(); }
-    Value *code_gen();
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 
@@ -379,7 +368,7 @@ struct printslit : public stmt {
     string str;
 
     printslit(string s) : str(s.substr(1,s.size() - 2)) {}
-    Value *code_gen();
+    void code_gen();
 
     virtual void yaml(ostream &os, string prefix);
 };
