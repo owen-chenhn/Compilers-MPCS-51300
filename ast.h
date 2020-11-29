@@ -335,7 +335,7 @@ struct whilestmt : public stmt {
     stmt *statement;
     
     whilestmt(expr *c, stmt *s) : condition(c), statement(s) {}
-    void check_exp() { condition->check_type(); statement->check_exp(); }
+    void check_exp();
     Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);
@@ -351,11 +351,7 @@ struct ifstmt : public stmt {
     ifstmt(expr *e, stmt *s, stmt *es = 0) : 
         condition(e), statement(s), else_statement(es) {}
 
-    void check_exp() { 
-        condition->check_type(); 
-        statement->check_exp(); 
-        if (else_statement) else_statement->check_exp(); 
-    }
+    void check_exp();
     Value *code_gen();
 
     virtual void yaml(ostream &os, string prefix);

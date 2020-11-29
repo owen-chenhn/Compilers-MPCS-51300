@@ -316,6 +316,26 @@ void expstmt::yaml(ostream &os, string prefix) {
         expression->yaml(os, prefix + "  ");
 }
 
+
+static void check_condition(expr *cond) {
+    if (cond->exp_type->kind != type::t_bool) 
+        error("Condition expression must be of type bool.");
+}
+
+void whilestmt::check_exp() {
+    condition->check_type(); 
+    check_condition(condition);
+    statement->check_exp(); 
+}
+
+void ifstmt::check_exp()  {
+    condition->check_type(); 
+    check_condition(condition);
+    statement->check_exp(); 
+    if (else_statement) 
+        else_statement->check_exp(); 
+}
+
 void whilestmt::yaml(ostream &os, string prefix) {
         os << prefix << "name: while" << endl;
         os << prefix << "cond: " << endl;
