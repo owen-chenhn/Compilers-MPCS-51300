@@ -30,7 +30,6 @@ using namespace llvm;
 
 // Table of all (mutable) variable addresses
 static unordered_map<string, AllocaInst *> name_to_Value;
-static Constant *printf_int_fmt = nullptr, *printf_float_fmt = nullptr;
 
 // Classes for llvm code generation
 unique_ptr<LLVMContext> context = make_unique<LLVMContext>();
@@ -283,17 +282,28 @@ Value* castexp::code_gen() {
     }
 }
 
-Value *ret::code_gen() {
-    if (expression) {
-        Value *exp_v = expression->code_gen();
-        if (!exp_v) return nullptr;
-        return builder->CreateRet(exp_v);
+/* Code gen for statements. */
+void blk::code_gen() {
+    for (stmt *st : statements->statements) {
+        st->code_gen();
     }
-    else
-        return builder->CreateRetVoid();
 }
 
-Value *vdeclstmt::code_gen() {
+void ret::code_gen() {
+    if (expression) {
+        Value *exp_v = expression->code_gen();
+        builder->CreateRet(exp_v);
+    }
+    else
+        builder->CreateRetVoid();
+
+    // Create a new basic block
+    Function *the_func = builder->GetInsertBlock()->getParent();
+    BasicBlock *bb = BasicBlock::Create(*context, "continue", the_func);
+    builder->SetInsertPoint(bb);
+}
+
+void vdeclstmt::code_gen() {
     AllocaInst *alloc_v = variable->code_gen();
     Value *exp_v;
     if (!variable->tp->ref) {
@@ -303,13 +313,11 @@ Value *vdeclstmt::code_gen() {
         if (expression->exp_type->ref) 
             exp_v = builder->CreateLoad(exp_v, "loadtmp");
     }
-    if (!exp_v || !alloc_v) return nullptr;
 
     builder->CreateStore(exp_v, alloc_v);
-    return exp_v;
 }
 
-Value *whilestmt::code_gen() {
+void whilestmt::code_gen() {
     Function *the_func = builder->GetInsertBlock()->getParent();
     BasicBlock *head_bb = BasicBlock::Create(*context, "loop_head", the_func), 
                *body_bb = BasicBlock::Create(*context, "loop_body"), 
@@ -318,24 +326,22 @@ Value *whilestmt::code_gen() {
     builder->CreateBr(head_bb);
     builder->SetInsertPoint(head_bb);
     Value *cond_v = condition->code_gen();
-    if (!cond_v) return nullptr;
     builder->CreateCondBr(cond_v, body_bb, exit_bb);
 
     // loop body
     the_func->getBasicBlockList().push_back(body_bb);
     builder->SetInsertPoint(body_bb);
     statement->code_gen();
-    builder->CreateBr(head_bb);
+    if (!statement->is_return())
+        builder->CreateBr(head_bb);
 
     // loop exit
     the_func->getBasicBlockList().push_back(exit_bb);
     builder->SetInsertPoint(exit_bb);
-    return Constant::getNullValue(Type::getInt32Ty(*context));
 }
 
-Value *ifstmt::code_gen() {
+void ifstmt::code_gen() {
     Value *cond_v = condition->code_gen();
-    if (!cond_v) return nullptr;
 
     Function *the_func = builder->GetInsertBlock()->getParent();
     BasicBlock *then_bb = BasicBlock::Create(*context, "then", the_func), 
@@ -345,25 +351,23 @@ Value *ifstmt::code_gen() {
 
     // insert then's code
     builder->SetInsertPoint(then_bb);
-    Value *then_v = statement->code_gen();
-    if (!then_v) return nullptr;
+    statement->code_gen();
     builder->CreateBr(merge_bb);
 
     // insert else's code
     the_func->getBasicBlockList().push_back(else_bb);
     builder->SetInsertPoint(else_bb);
     if (else_statement) {
-        if (!else_statement->code_gen()) return nullptr;
+        else_statement->code_gen();
     }
     builder->CreateBr(merge_bb);
 
     // merge block
     the_func->getBasicBlockList().push_back(merge_bb);
     builder->SetInsertPoint(merge_bb);
-    return Constant::getNullValue(Type::getInt32Ty(*context));
 }
 
-Value *print::code_gen() {
+void print::code_gen() {
     bool float_flag = expression->exp_type->kind == type::t_float;
     string format_str = float_flag ? "%f\n" : "%d\n";
     Value *str_v = builder->CreateGlobalStringPtr(StringRef(format_str));
@@ -374,20 +378,20 @@ Value *print::code_gen() {
 
     vector<Value *> args = { str_v, exp_v };
     Function* printFunc = module->getFunction("printf");
-    if (!printFunc) return LogErrorV("Function printf undeclared");
+    if (!printFunc) LogErrorV("Function printf undeclared");
 
-    return builder->CreateCall(printFunc, args, "callprintf");
+    builder->CreateCall(printFunc, args, "callprintf");
 }
 
-Value *printslit::code_gen() {
+void printslit::code_gen() {
     // generate code for string
     Value *str_v = builder->CreateGlobalStringPtr(StringRef(str + '\n'));
 
     Function* printFunc = module->getFunction("printf");
-    if (!printFunc) return LogErrorV("Function printf undeclared");
+    if (!printFunc) LogErrorV("Function printf undeclared");
 
     vector<Value *> args = { str_v };
-    return builder->CreateCall(printFunc, args, "callprintf");
+    builder->CreateCall(printFunc, args, "callprintf");
 }
 
 Function *func::code_gen() {
@@ -428,6 +432,8 @@ Function *func::code_gen() {
     block->code_gen();
     if (rt->kind == type::t_void)
         builder->CreateRetVoid();
+    else 
+        builder->CreateRet(Constant::getNullValue(builder->getCurrentFunctionReturnType()));
     
     // verify the generated code
     verifyFunction(*f, &llvm::errs());

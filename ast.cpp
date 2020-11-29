@@ -373,30 +373,29 @@ func::func(type *r, id *g, blk *b, vdecls *v) :
             error("Funtion 'run' must have return type int or cint.");
         if (v != NULL) error("Funtion 'run' cannot have arguments.");
     }
-    if (block->statements == NULL && rt->kind != type::t_void) 
+    if (block->statements->statements.size() == 0 && rt->kind != type::t_void) 
         error("Funtion '" + globid->identifier + "' has empty body but non-void return type.");
 
     function_table[globid->identifier] = this;
 
     // Check function block and return type
-    if (block->statements) {
-        for (stmt *st : block->statements->statements) {
-            st->check_exp();
-            if (st->is_return()) {
-                ret *ret_stmt = (ret *) st;
-                if (!ret_stmt->expression && rt->kind != type::t_void) {
-                    error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-                    "Expect " + rt->name() + " but returns nothing.");
-                }
-                if (ret_stmt->expression && 
-                    ret_stmt->expression->exp_type->kind != rt->kind) {
-                    error("Funtion '" + globid->identifier + "' has wrong return type. " + 
-                    "Expect " + rt->name() + " but got " + 
-                    ret_stmt->expression->exp_type->name() + ".");
-                }
+    for (stmt *st : block->statements->statements) {
+        st->check_exp();
+        if (st->is_return()) {
+            ret *ret_stmt = (ret *) st;
+            if (!ret_stmt->expression && rt->kind != type::t_void) {
+                error("Funtion '" + globid->identifier + "' has wrong return type. " + 
+                "Expect " + rt->name() + " but returns nothing.");
+            }
+            if (ret_stmt->expression && 
+                ret_stmt->expression->exp_type->kind != rt->kind) {
+                error("Funtion '" + globid->identifier + "' has wrong return type. " + 
+                "Expect " + rt->name() + " but got " + 
+                ret_stmt->expression->exp_type->name() + ".");
             }
         }
     }
+    
     vdecl_table.clear();
 }
 
