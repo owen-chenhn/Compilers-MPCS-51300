@@ -78,7 +78,17 @@ void exps::yaml(ostream &os, string prefix) {
 void lit::yaml(ostream &os, string prefix) {
         os << prefix << "name: lit" << endl;
         os << prefix << "type: " << exp_type->name() << endl;
-        os << prefix << "value: " << it << endl;
+        os << prefix << "value: " << get_str() << endl;
+}
+
+string lit::get_str() {
+    if (exp_type->kind != type::t_bool) {
+        return to_string(it);
+    } else if (it == 0) {
+        return "false";
+    } else {
+        return "true";
+    }
 }
 
 void flit::yaml(ostream &os, string prefix) {
