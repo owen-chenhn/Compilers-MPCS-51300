@@ -25,19 +25,19 @@ Bonus:
 
 For assignment 3, 
 
-We assume llvm-config and clang version of 7.0 in the environment for successful make. 
-
-After make, you can run ./bin/ekcc -emit-llvm -o <output_file> <input_file> 
-and get the IR(somewhat a .ll) <output_file>. 
-
-Or run ./bin/ekcc -o <output_file> <input_file> and get the <output_file> executable.
-
-
+We assume llvm-config and clang version of 7.0 in the environment for successful make.  
+After make, you can run ./bin/ekcc -emit-llvm -o <output_file> <input_file>  
+and get the IR(somewhat a .ll) <output_file>.  
+Or run ./bin/ekcc -o <output_file> <input_file> and get the <output_file> executable.  
 We currently still have some issues linking the getarg functions in customed library. The program can still run, starting from run(), and print.  
 
 
 For assignment 4,  
-
 We have fixed all the deficits mentioned above. Optimization is added.  
-
 Note: for now we haven't implemented **JIT** execution yet. Please statically compile input program and run the executable.  
+
+
+For assignemnt 5,  
+1. We cint type check is implemented.  
+2. JIT is implemented and bugs are fixed.  
+3. Some LLVM IR bugs are fixed. This includes intermediate terminators in some basic blocks when return stmts occur.  
