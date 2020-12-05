@@ -36,15 +36,14 @@ void Header() {
 }
 
 void Usage() {
-    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-funcinline] [-instcmb] [-reassoc] [-cfgsimp] [-sroa] [-emit-ast|-emit-llvm] [-jit] [-t] -o <output-file> <input-file>\n" << 
+    cout << "Usage: ./bin/ekcc [-h|-?] [-v] [-O] [-funcinline] [-instcmb] [-reassoc] [-cfgsimp] [-emit-ast|-emit-llvm] [-jit] [-t] -o <output-file> <input-file>\n" << 
             "\t" << "-h|-?: Print helper message.\n" << 
             "\t" << "-v: Enable verbose mode.\n" << 
             "\t" << "-O: Enable optimizations.\n" <<
             "\t" << "-funcinline: Enable llvm -inline optimization if -O enabled. \n" <<
             "\t" << "-instcmb: Enable llvm -instcombine optimization if -O enabled. \n" <<
             "\t" << "-reassoc: Enable llvm -reassociate optimization if -O enabled. \n" <<
-            "\t" << "-cfgsimp: Enable llvm -simplifycfg optimization if -O enabled. \n" <<
-            "\t" << "-sroa: Enable llvm -sroa optimization if -O enabled. \n" <<                        
+            "\t" << "-cfgsimp: Enable llvm -simplifycfg optimization if -O enabled. \n" <<                      
             "\t" << "-emit-ast: Produce the AST of the input program to the output file.\n" << 
             "\t" << "-emit-llvm: Produce the LLVM IR of the input program to the output file.\n" << 
             "\t" << "-jit: Run input program directly. [Note: when this flag is present, <output-file> (-o flag) does not need to be specified]\n" <<
@@ -60,7 +59,7 @@ int main(int argc, char* argv[]) {
     extern prog *the_prog;
 
     bool verbose = false, optimize = false, emit_ast = false, emit_llvm = false, out_flag = false, jit = false, 
-         time = false, sroa = false, func_inline = false, inst_comb = false, reassoc = false, cfg_simp = false;
+         time = false, func_inline = false, inst_comb = false, reassoc = false, cfg_simp = false;
     string output = "";
 
     // Command-line options parsing
@@ -69,8 +68,7 @@ int main(int argc, char* argv[]) {
         {"funcinline", no_argument, nullptr, 'f'},
         {"instcmb", no_argument, nullptr, 'i'},
         {"reassoc", no_argument, nullptr, 'r'},
-        {"cfgsimp", no_argument, nullptr, 'c'},
-        {"sroa", no_argument, nullptr, 's'},           
+        {"cfgsimp", no_argument, nullptr, 'c'},       
         {"emit-ast", no_argument, nullptr, 'a'}, 
         {"emit-llvm", no_argument, nullptr, 'l'},
         {"jit", no_argument, nullptr, 'j'},
@@ -112,9 +110,6 @@ int main(int argc, char* argv[]) {
             break;
         case 'r':
             reassoc = true;
-            break;
-        case 's':
-            sroa = true;
             break;
         case 'i':
             inst_comb = true;

@@ -3,10 +3,9 @@ declare -a opt_str_arr=(""
                         "-instcmb" 
                         "-reassoc" 
                         "-cfgsimp" 
-                        "-sroa" 
-                        "-funcinline -instcmb -reassoc -cfgsimp -sroa")
+                        "-funcinline -instcmb -reassoc -cfgsimp")
 
-declare -a files_str_arr=("test1.ek" "test2.ek" "test3.ek" "test4.ek")                    
+declare -a files_str_arr=("inline.ek" "inst_cmb.ek" "reass.ek" "cfg_simp.ek")                    
 
 for i in "${opt_str_arr[@]}"
 do 
