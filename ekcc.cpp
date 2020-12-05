@@ -178,7 +178,7 @@ int main(int argc, char* argv[]) {
         if (inst_comb) FPM->add(createInstructionCombiningPass());
         if (reassoc) FPM->add(createReassociatePass());
         if (cfg_simp) FPM->add(createCFGSimplificationPass()); 
-        if (sroa) FPM->add(createSROAPass());
+        //if (sroa) FPM->add(createSROAPass());
         
         unique_ptr<legacy::PassManager> MPM(new legacy::PassManager);
 
