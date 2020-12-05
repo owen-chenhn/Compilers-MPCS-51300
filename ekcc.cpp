@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (!optimize) {
-        if (func_inline || sroa || inst_comb || reassoc || cfg_simp) {
+        if (func_inline || inst_comb || reassoc || cfg_simp) {
             cout << "error: detailed optimizations flags are not allowed without enabling -O first. \n";
             exit(-1);
         }
