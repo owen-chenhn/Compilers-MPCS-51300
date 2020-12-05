@@ -1,0 +1,24 @@
+def void inc (ref int $n) {
+  $n = $n + 1;
+}
+
+def void dec (ref int $n) {
+    $n = $n - 1;
+}
+
+def int run () {
+    int $a = 0;
+    int $b = 5;
+    int $c = 10;
+    while ($a < 100000000000) {
+        inc($b);
+        inc($a);
+        inc($c);
+    }
+    while ($b > 0) {
+        dec($a);
+        dec($b);
+        dec($c);
+    }
+    return 0;
+}
