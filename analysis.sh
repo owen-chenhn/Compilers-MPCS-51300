@@ -14,6 +14,6 @@ do
     for j in "${files_str_arr[@]}"
     do 
         echo "      file: " "$j"
-        ./bin/ekcc -O -jit $i -t ../test/$j 
+        ./bin/ekcc -O -jit $i -t ./test_files/$j 
     done 
 done 

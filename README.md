@@ -41,3 +41,11 @@ For assignemnt 5,
 1. We cint type check is implemented.  
 2. JIT is implemented and bugs are fixed.  
 3. Some LLVM IR bugs are fixed. This includes intermediate terminators in some basic blocks when return stmts occur.  
+
+
+For assignment 6,
+1. Please first make
+2. chmod for analysis.sh 
+3. run ./analysis.sh 
+
+We have included in ./test, 5 files, with 4 of them having related codes for the optimzation of its filename, and another filer having all theses codes included. 
